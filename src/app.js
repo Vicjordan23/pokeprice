@@ -82,7 +82,8 @@ function viewCollection() {
       <div class="label" id="sync"></div>
     </section>
     <h2>Tus cartas más valiosas</h2>
-    ${rows ? `<div class="list">${rows}</div>` : `<p class="empty">Aún no tienes cartas. Busca una y pulsa «Añadir a mi colección».</p>`}`;
+    ${rows ? `<div class="list">${rows}</div>` : `<p class="empty">Aún no tienes cartas. Busca una y pulsa «Añadir a mi colección».</p>`}
+    <p class="legal">Proyecto de aficionados, sin relación con Nintendo, Game Freak ni The Pokémon Company. Pokémon y sus ilustraciones son marcas de sus propietarios. Precios: medias diarias vía pokemontcg.io (Cardmarket y TCGplayer); no son ofertas de compra ni venta.</p>`;
 }
 
 function viewSearch() {

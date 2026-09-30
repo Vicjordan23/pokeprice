@@ -29,6 +29,10 @@ Sin dependencias (solo Node). Los módulos ES necesitan servirse por HTTP, no ab
 - Los precios son medias que la API actualiza a diario, no el precio en tiempo real.
 - Revisa los términos de uso de pokemontcg.io antes de un uso comercial.
 
+## Publicación
+
+Se publica sola en GitHub Pages con cada push a la rama principal (`.github/workflows/pages.yml`): pasa las pruebas y sube `index.html` y `src/`. Requiere activar una vez **Settings → Pages → Source: GitHub Actions**.
+
 ## Siguientes pasos
 
 - **Avisos con la app cerrada:** un pequeño servidor (o función programada) que consulte los precios y envíe notificaciones push (Web Push) o correo. Hoy las alertas viven solo en el navegador.

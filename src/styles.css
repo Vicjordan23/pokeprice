@@ -126,3 +126,4 @@ select:focus,.panel input:focus{outline:0;border-color:var(--a);box-shadow:0 0 1
 @media (max-width:600px){.p1{width:38vw;top:9vh;right:-8vw}.p2{width:40vw;bottom:14vh}.p3{width:20vw;top:46vh}.p4{display:none}}
 #results{margin-top:16px}
 .field input::-webkit-search-cancel-button{filter:invert(1) brightness(1.5);cursor:pointer}
+.legal{margin:28px 0 0;font-size:12px;line-height:1.5;color:var(--mute);text-align:center}
