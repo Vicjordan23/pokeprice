@@ -60,3 +60,42 @@ export function collectionTotal(owned, cards) {
 export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
+
+// ---------- Escáner (OCR) ----------
+
+const NOT_A_NAME = /^(basic|stage\s*\d|hp\b|pok[eé]mon|trainer|energy|supporter|item|tool|illus|weakness|resistance|retreat)/i;
+
+/**
+ * Extrae del texto del OCR el número de carta ("199/165") y posibles nombres.
+ * El número no depende del idioma de la carta; el nombre solo sirve si coincide con el inglés de la API.
+ */
+export function parseCardText(text) {
+  const t = String(text ?? '');
+  const m = t.match(/(\d{1,3})\s*\/\s*(\d{1,3})/);
+  const names = t
+    .split('\n')
+    .slice(0, 8)
+    .map((l) => (l.replace(/\bHP\b.*$/i, '').match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.-]*(?: [A-Za-zÀ-ÿ'’.-]+)*/g) ?? []))
+    .flat()
+    .filter((s) => s.length >= 3 && !NOT_A_NAME.test(s))
+    .slice(0, 3);
+  return { number: m ? String(parseInt(m[1], 10)) : null, total: m ? parseInt(m[2], 10) : null, names };
+}
+
+/** Consulta para pokemontcg.io a partir de lo leído: número + total impreso, o si no el nombre. */
+export function buildScanQuery(parsed) {
+  if (parsed.number && parsed.total) return `number:${parsed.number} set.printedTotal:${parsed.total}`;
+  return parsed.names.length ? buildQuery(parsed.names[0]) : null;
+}
+
+/** Ordena candidatos: primero los cuyo nombre aparece en el texto leído. */
+export function rankMatches(cards, text) {
+  const lower = String(text ?? '').toLowerCase();
+  const score = (c) => {
+    const name = String(c.name ?? '').toLowerCase();
+    if (name && lower.includes(name)) return 2 + name.length / 100;
+    const first = name.split(' ')[0];
+    return first && first.length >= 3 && lower.includes(first) ? 1 : 0;
+  };
+  return cards.map((c, i) => ({ c, i, s: score(c) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.c);
+}

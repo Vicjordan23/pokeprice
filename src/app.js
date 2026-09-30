@@ -1,4 +1,4 @@
-import { cardValue, changePct, chartPoints, buildQuery, buildIdsQuery, collectionTotal, esc } from './lib.js';
+import { cardValue, changePct, chartPoints, buildQuery, buildIdsQuery, collectionTotal, esc, parseCardText, buildScanQuery, rankMatches } from './lib.js';
 import { CONFIG } from './config.js';
 
 const SELECT = 'id,name,number,rarity,set,images,tcgplayer,cardmarket';
@@ -10,7 +10,7 @@ const usd = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD' 
 const pctFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 const $app = document.getElementById('app');
-const state = { cards: load(KEY_CARDS, {}), owned: load(KEY_OWNED, {}), search: { text: '', results: null, status: 'idle' } };
+const state = { cards: load(KEY_CARDS, {}), owned: load(KEY_OWNED, {}), search: { text: '', results: null, status: 'idle' }, scan: { status: 'idle', msg: '', preview: null, info: '', results: null } };
 
 function load(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -94,6 +94,26 @@ function resultsHtml() {
   return `<div class="list">${s.results.map(cardRow).join('')}</div>`;
 }
 
+function viewScan() {
+  const sc = state.scan;
+  const busy = sc.status === 'working';
+  return `<header class="top"><h1>Escanear carta</h1></header>
+    <p class="hint">Haz una foto a la carta, plana, con buena luz y que se vea el nombre y el número de abajo (por ejemplo 199/165). Todo se lee en tu móvil; la foto no se sube a ningún sitio.</p>
+    <label class="btn pri filebtn${busy ? ' disabled' : ''}" for="scan-file">${busy ? 'Leyendo…' : 'Hacer foto o elegir imagen'}</label>
+    <input id="scan-file" class="sr-only" type="file" accept="image/*" capture="environment" ${busy ? 'disabled' : ''}>
+    ${sc.preview ? `<img class="scan-prev" src="${esc(sc.preview)}" alt="Foto de la carta">` : ''}
+    <div id="scan-out">${scanOut()}</div>`;
+}
+
+function scanOut() {
+  const sc = state.scan;
+  const msg = sc.msg ? `<p class="empty ${sc.status === 'error' ? 'error' : ''}" ${sc.status === 'error' ? 'role="alert"' : ''}>${esc(sc.msg)}</p>` : '';
+  const info = sc.info ? `<small class="src">Leído: ${esc(sc.info)}</small>` : '';
+  if (!sc.results) return msg + info;
+  if (!sc.results.length) return `${msg || '<p class="empty">No encontré ninguna carta con lo leído.</p>'}${info}`;
+  return `<h2>Posibles coincidencias</h2><div class="list">${sc.results.slice(0, 8).map(cardRow).join('')}</div>${info}<small class="src">Comprueba que sea la tuya antes de añadirla.</small>`;
+}
+
 function viewDetail(id) {
   const card = state.cards[id];
   if (!card) return `<header class="top"><a class="back" href="#/buscar" aria-label="Volver">‹</a></header><p class="empty" id="detail-status">Cargando carta…</p>`;
@@ -151,7 +171,7 @@ function chartSvg(pts) {
 
 function tabs(route) {
   const on = (r) => (route === r ? ' on' : '');
-  return `<nav class="tabs"><a class="${on('coleccion').trim()}" href="#/">Colección</a><a class="${on('buscar').trim()}" href="#/buscar">Buscar</a></nav>`;
+  return `<nav class="tabs"><a class="${on('coleccion').trim()}" href="#/">Colección</a><a class="${on('escanear').trim()}" href="#/escanear">Escanear</a><a class="${on('buscar').trim()}" href="#/buscar">Buscar</a></nav>`;
 }
 
 // ---------- Router ----------
@@ -161,7 +181,7 @@ let prevHash = '#/';
 async function render() {
   const hash = location.hash || '#/';
   const m = hash.match(/^#\/carta\/([\w.-]+)$/);
-  const route = m ? 'carta' : hash.startsWith('#/buscar') ? 'buscar' : 'coleccion';
+  const route = m ? 'carta' : hash.startsWith('#/buscar') ? 'buscar' : hash.startsWith('#/escanear') ? 'escanear' : 'coleccion';
   if (route !== 'carta') prevHash = hash;
   window.scrollTo(0, 0);
 
@@ -176,6 +196,11 @@ async function render() {
       }
       if (location.hash === hash) $app.innerHTML = viewDetail(m[1]);
     }
+    return;
+  }
+
+  if (route === 'escanear') {
+    $app.innerHTML = viewScan() + tabs('escanear');
     return;
   }
 
@@ -235,6 +260,64 @@ function paintResults() {
   const el = document.getElementById('results');
   if (el) el.innerHTML = resultsHtml();
 }
+
+let scanSeq = 0;
+function paintScan(full) {
+  if (!location.hash.startsWith('#/escanear')) return;
+  if (full) $app.innerHTML = viewScan() + tabs('escanear');
+  else { const el = document.getElementById('scan-out'); if (el) el.innerHTML = scanOut(); }
+}
+
+async function toCanvas(file, max = 1600) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close?.();
+  return canvas;
+}
+
+async function loadOcr() {
+  const mod = await import(/* @vite-ignore */ CONFIG.ocrModule);
+  return mod.default ?? mod;
+}
+
+async function scanFile(file) {
+  const seq = ++scanSeq;
+  const sc = state.scan;
+  if (sc.preview) URL.revokeObjectURL(sc.preview);
+  Object.assign(sc, { status: 'working', msg: 'Leyendo la carta… la primera vez descarga el lector de texto (unos segundos).', preview: URL.createObjectURL(file), info: '', results: null });
+  paintScan(true);
+  const fail = (msg) => { if (seq === scanSeq) { Object.assign(sc, { status: 'error', msg, results: null }); paintScan(true); } };
+  let text;
+  try {
+    const canvas = await toCanvas(file);
+    const T = await loadOcr();
+    text = (await T.recognize(canvas, 'eng')).data.text;
+  } catch {
+    return fail('No se pudo leer la imagen. Comprueba tu conexión (el lector de texto se descarga una vez) e inténtalo de nuevo.');
+  }
+  if (seq !== scanSeq) return;
+  const parsed = parseCardText(text);
+  const q = buildScanQuery(parsed);
+  const info = [parsed.number ? `${parsed.number}/${parsed.total}` : null, parsed.names[0]].filter(Boolean).join(' · ');
+  if (!q) return fail('No pude leer el nombre ni el número. Prueba con más luz, la carta plana y más cerca.');
+  try {
+    let data = await api({ q, pageSize: '40' });
+    if (!data.length && parsed.names.length) data = await api({ q: buildQuery(parsed.names[0]), pageSize: '40' });
+    if (seq !== scanSeq) return;
+    Object.assign(sc, { status: 'done', msg: '', info, results: rankMatches(data, text) });
+  } catch {
+    return fail('Leí la carta pero no pude consultar pokemontcg.io. Inténtalo de nuevo.');
+  }
+  paintScan(true);
+}
+
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'scan-file' && e.target.files?.[0]) scanFile(e.target.files[0]);
+});
 
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');

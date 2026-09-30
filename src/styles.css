@@ -50,3 +50,9 @@ a{color:inherit}
 .tabs a{flex:1;max-width:240px;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:14px;font-weight:500;color:#4A4234}
 .tabs a.on{color:var(--accent);font-weight:700}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{color:var(--mute);font-size:14px;line-height:1.4;margin:4px 0 14px}
+.filebtn{display:flex;align-items:center;justify-content:center;width:100%;max-width:none}
+.filebtn.disabled{opacity:.6;pointer-events:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.filebtn:has(+ .sr-only:focus-visible){outline:2px solid var(--ink);outline-offset:2px}
+.scan-prev{display:block;width:120px;border-radius:10px;margin:14px auto 0}

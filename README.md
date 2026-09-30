@@ -7,9 +7,10 @@ Datos de precios vía [pokemontcg.io](https://docs.pokemontcg.io/) (Cardmarket e
 
 - **Buscar:** por nombre (y número opcional: `charizard 199`).
 - **Ficha:** precio de tendencia de Cardmarket, variación 7d/30d, mini-gráfica con las medias de 30d, 7d y 1d, y precios por mercado.
+- **Escanear:** haces una foto (o eliges una imagen), un OCR en el navegador ([Tesseract.js](https://github.com/naptha/tesseract.js), se descarga de jsDelivr al primer uso) lee el número de carta (`199/165`) y el nombre, y se buscan candidatos en pokemontcg.io. La foto no se sube a ningún servidor. Funciona mejor con cartas en inglés y buena luz; con otro idioma se apoya en el número.
 - **Colección:** guarda cartas en el navegador (localStorage), suma su valor y refresca los precios al abrir.
 
-No incluye todavía: escáner por cámara, precios por estado (NM/LP…), cartas gradadas ni alertas. La API gratuita no da esos datos.
+No incluye todavía: visor de cámara en vivo, reconocimiento por imagen (solo OCR de texto), precios por estado (NM/LP…), cartas gradadas ni alertas. La API gratuita no da esos datos.
 
 ## Usar
 

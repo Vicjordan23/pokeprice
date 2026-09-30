@@ -42,3 +42,26 @@ test('collectionTotal suma valor × cantidad', () => {
 test('esc escapa HTML', () => {
   assert.equal(esc('<img src=x onerror="a">'), '&lt;img src=x onerror=&quot;a&quot;&gt;');
 });
+
+import { parseCardText, buildScanQuery, rankMatches } from '../src/lib.js';
+
+test('parseCardText saca número, total y nombres', () => {
+  const p = parseCardText('Basic Pokémon\nCharizard ex   HP 330\nfoo\n199/165 SV3');
+  assert.equal(p.number, '199');
+  assert.equal(p.total, 165);
+  assert.equal(p.names[0], 'Charizard ex');
+  assert.equal(parseCardText('sin numero').number, null);
+  assert.deepEqual(parseCardText('1234 ---').names, []);
+  assert.equal(parseCardText('004 / 102').number, '4');
+});
+
+test('buildScanQuery prefiere número+total y cae al nombre', () => {
+  assert.equal(buildScanQuery({ number: '4', total: 102, names: ['Charizard'] }), 'number:4 set.printedTotal:102');
+  assert.equal(buildScanQuery({ number: null, total: null, names: ['Charizard'] }), 'name:"Charizard*"');
+  assert.equal(buildScanQuery({ number: null, total: null, names: [] }), null);
+});
+
+test('rankMatches pone primero el nombre presente en el texto', () => {
+  const cards = [{ name: 'Pikachu' }, { name: 'Charizard ex' }, { name: 'Charizard' }];
+  assert.deepEqual(rankMatches(cards, 'CHARIZARD ex HP 330').map((c) => c.name), ['Charizard ex', 'Charizard', 'Pikachu']);
+});
