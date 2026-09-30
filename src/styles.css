@@ -1,12 +1,11 @@
-/* ===== Temas: variables por [data-theme] ===== */
+/* ===== Colores: aurora (azul, violeta y verde fluorescente) ===== */
 :root{
   --ink:#EEF2FF;--mute:#B4BEE8;--up:#3DFF9A;--down:#FF6B9A;
   --line:rgba(150,170,255,.28);--card:rgba(14,18,58,.62);--card2:rgba(30,36,96,.55);
   --btn-ink:#06101F;
+  --bg1:#020C26;--bg2:#1C0B5C;--bg3:#003B66;--a:#39FF14;--b:#00C2FF;--glow:rgba(57,255,20,.5);--glow2:rgba(0,194,255,.5);
 }
-[data-theme=cyber]{--bg1:#040614;--bg2:#0A1450;--bg3:#1A0640;--a:#00E5FF;--b:#B026FF;--glow:rgba(0,229,255,.55);--glow2:rgba(176,38,255,.5)}
-[data-theme=violet]{--bg1:#0D0122;--bg2:#2B0A66;--bg3:#0A1257;--a:#FF2BD6;--b:#7C4DFF;--glow:rgba(255,43,214,.55);--glow2:rgba(124,77,255,.55);--hi:#C6FF00}
-[data-theme=aurora]{--bg1:#020C26;--bg2:#1C0B5C;--bg3:#003B66;--a:#39FF14;--b:#00C2FF;--glow:rgba(57,255,20,.5);--glow2:rgba(0,194,255,.5)}
+
 
 *{box-sizing:border-box}
 html{background:var(--bg1)}
@@ -31,10 +30,6 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opa
 @keyframes float{50%{transform:translateY(-14px) rotate(1.5deg)}}
 @media (prefers-reduced-motion:reduce){.pk{animation:none}}
 
-/* selector de tema */
-#themebar{position:fixed;top:14px;right:14px;z-index:20;display:flex;gap:8px;padding:6px;border-radius:24px;background:var(--card);border:1px solid var(--line);backdrop-filter:blur(12px)}
-#themebar button{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:linear-gradient(135deg,var(--s1),var(--s2))}
-#themebar button[aria-pressed=true]{border-color:#fff;box-shadow:0 0 12px var(--s1)}
 
 /* ===== Layout ===== */
 #app{position:relative;z-index:1;max-width:520px;margin:0 auto;min-height:100vh;padding:0 20px 120px}
@@ -130,3 +125,4 @@ select:focus,.panel input:focus{outline:0;border-color:var(--a);box-shadow:0 0 1
 /* móvil: Pokémon más pequeños para no tapar el contenido */
 @media (max-width:600px){.p1{width:38vw;top:9vh;right:-8vw}.p2{width:40vw;bottom:14vh}.p3{width:20vw;top:46vh}.p4{display:none}}
 #results{margin-top:16px}
+.field input::-webkit-search-cancel-button{filter:invert(1) brightness(1.5);cursor:pointer}
