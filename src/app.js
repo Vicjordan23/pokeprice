@@ -30,7 +30,7 @@ function save() {
 
 async function api(params) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
+  const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
     const headers = CONFIG.apiKey ? { 'X-Api-Key': CONFIG.apiKey } : {};
     const res = await fetch(`${CONFIG.apiBase}/cards?${new URLSearchParams({ select: SELECT, ...params })}`, { headers, signal: ctrl.signal });
@@ -38,6 +38,11 @@ async function api(params) {
     const json = await res.json();
     for (const c of json.data) state.cards[c.id] = c;
     return json.data;
+  } catch (err) {
+    const reason = err.name === 'AbortError' ? 'tiempo agotado (30 s)' : err.message;
+    console.error('pokemontcg.io:', reason, err);
+    state.lastApiError = reason;
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -91,7 +96,7 @@ function viewSearch() {
 function resultsHtml() {
   const s = state.search;
   if (s.status === 'loading') return '<p class="empty">Buscando…</p>';
-  if (s.status === 'error') return '<p class="empty error" role="alert">No se pudo consultar pokemontcg.io. Comprueba tu conexión e inténtalo de nuevo.</p>';
+  if (s.status === 'error') return `<p class="empty error" role="alert">No se pudo consultar pokemontcg.io (${esc(state.lastApiError ?? 'sin conexión')}). Inténtalo de nuevo.</p>`;
   if (s.results == null) return '<p class="empty">Escribe al menos 2 letras.</p>';
   if (!s.results.length) return '<p class="empty">Sin resultados.</p>';
   return `<div class="list">${s.results.map(cardRow).join('')}</div>`;
