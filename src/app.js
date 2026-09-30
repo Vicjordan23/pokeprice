@@ -1,10 +1,10 @@
-import { cardValue, changePct, chartPoints, buildQuery, buildIdsQuery, collectionTotal, esc, parseCardText, buildScanQueries, rankMatches, parseTarget, checkAlerts } from './lib.js';
+import { cardValue, changePct, chartPoints, collectionTotal, esc, parseCardText, rankMatches, parseTarget, checkAlerts, parseSearchText } from './lib.js';
+import { getCard, loadCards, searchByName, findByNumber, net } from './tcgdex.js';
 import { CONFIG } from './config.js';
 
-const SELECT = 'id,name,number,rarity,set,images,tcgplayer,cardmarket';
-const KEY_OWNED = 'pokeprice.owned.v1';
-const KEY_CARDS = 'pokeprice.cards.v1';
-const KEY_ALERTS = 'pokeprice.alerts.v1';
+const KEY_OWNED = 'pokeprice.owned.v2';
+const KEY_CARDS = 'pokeprice.cards.v2';
+const KEY_ALERTS = 'pokeprice.alerts.v2';
 const CHECK_EVERY_MS = 15 * 60 * 1000;
 
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
@@ -28,35 +28,10 @@ function save() {
   } catch { /* almacenamiento no disponible: la app sigue funcionando en memoria */ }
 }
 
-async function api(params, { retry = false, timeout = 30000 } = {}) {
-  const attempts = retry ? 2 : 1;
-  for (let i = 1; i <= attempts; i++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeout);
-    try {
-      const headers = CONFIG.apiKey ? { 'X-Api-Key': CONFIG.apiKey } : {};
-      const res = await fetch(`${CONFIG.apiBase}/cards?${new URLSearchParams({ select: SELECT, ...params })}`, { headers, signal: ctrl.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      for (const c of json.data) state.cards[c.id] = c;
-      return json.data;
-    } catch (err) {
-      const reason = err.name === 'AbortError' ? `tiempo agotado (${timeout / 1000} s)` : err.message;
-      console.error('pokemontcg.io:', reason, err);
-      state.lastApiError = reason;
-      // Reintenta una vez si es un fallo del servidor o de red (pokemontcg.io a veces da 504 / se cuelga).
-      const transient = err.name === 'AbortError' || err.name === 'TypeError' || /^HTTP 5/.test(err.message);
-      if (i === attempts || !transient) throw err;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-}
-
 const money = (n) => (n == null ? '—' : eur.format(n));
 const pct = (n) => (n == null ? '' : `${n >= 0 ? '+' : '−'}${pctFmt.format(Math.abs(n))}%`);
 const pctClass = (n) => (n == null ? '' : n >= 0 ? 'up' : 'down');
-const dateEs = (s) => (s ? String(s).replace(/\//g, '-') : '');
+const dateEs = (s) => (s ? String(s).slice(0, 10).replace(/\//g, '-') : '');
 
 function thumb(card, cls = 'thumb') {
   const src = card.images?.small;
@@ -88,7 +63,7 @@ function viewCollection() {
     </section>
     <h2>Tus cartas más valiosas</h2>
     ${rows ? `<div class="list">${rows}</div>` : `<p class="empty">Aún no tienes cartas. Busca una y pulsa «Añadir a mi colección».</p>`}
-    <p class="legal">Proyecto de aficionados, sin relación con Nintendo, Game Freak ni The Pokémon Company. Pokémon y sus ilustraciones son marcas de sus propietarios. Precios: medias diarias vía pokemontcg.io (Cardmarket y TCGplayer); no son ofertas de compra ni venta.</p>`;
+    <p class="legal">Proyecto de aficionados, sin relación con Nintendo, Game Freak ni The Pokémon Company. Pokémon y sus ilustraciones son marcas de sus propietarios. Precios vía TCGdex (Cardmarket y TCGplayer), actualizados a diario; no son ofertas de compra ni venta.</p>`;
 }
 
 function viewSearch() {
@@ -102,10 +77,11 @@ function viewSearch() {
 function resultsHtml() {
   const s = state.search;
   if (s.status === 'loading') return '<p class="empty">Buscando…</p>';
-  if (s.status === 'error') return `<p class="empty error" role="alert">No se pudo consultar pokemontcg.io (${esc(state.lastApiError ?? 'sin conexión')}). Inténtalo de nuevo.</p>`;
+  if (s.status === 'error') return `<p class="empty error" role="alert">No se pudo consultar TCGdex (${esc(net.lastError ?? 'sin conexión')}). Inténtalo de nuevo.</p>`;
   if (s.results == null) return '<p class="empty">Escribe al menos 2 letras.</p>';
   if (!s.results.length) return '<p class="empty">Sin resultados.</p>';
-  return `<div class="list">${s.results.map(cardRow).join('')}</div>`;
+  const more = s.total > s.results.length ? `<p class="hint">Mostrando ${s.results.length} de ${s.total}. Añade el número de la carta para afinar (p. ej. «${esc(s.text.trim().split(' ')[0])} 23»).</p>` : '';
+  return `<div class="list">${s.results.map(cardRow).join('')}</div>${more}`;
 }
 
 function viewScan() {
@@ -151,7 +127,7 @@ function viewDetail(id) {
       <div class="kv"><span>Cardmarket · desde</span><b>${money(cm?.lowPrice)}</b></div>
       <div class="kv"><span>Cardmarket · media de venta</span><b>${money(cm?.averageSellPrice)}</b></div>
       ${tcgRows(card)}
-      <small class="src">Datos vía pokemontcg.io. Cardmarket actualizado: ${esc(dateEs(card.cardmarket?.updatedAt)) || 'n/d'}. Son medias, no el precio en tiempo real.</small>
+      <small class="src">Datos vía TCGdex. Cardmarket actualizado: ${esc(dateEs(card.cardmarket?.updatedAt)) || 'n/d'}. Son medias, no el precio en tiempo real.</small>
       <div class="links">${linkTo(card.cardmarket?.url, 'Ver en Cardmarket')}${linkTo(card.tcgplayer?.url, 'Ver en TCGplayer')}</div>
     </section>
     ${alertPanel(id, card)}
@@ -254,7 +230,7 @@ async function render() {
     $app.innerHTML = viewDetail(m[1]);
     if (!state.cards[m[1]]) {
       try {
-        await api({ q: `id:${m[1]}` });
+        { const c = await getCard(m[1]); if (!c) throw new Error('no encontrada'); state.cards[c.id] = c; }
       } catch {
         if (location.hash === hash) document.getElementById('detail-status').textContent = 'No se pudo cargar la carta.';
         return;
@@ -287,19 +263,15 @@ async function render() {
 
 async function refreshCollection(hash) {
   const ids = Object.keys(state.owned).filter((id) => state.owned[id] > 0);
-  const q = buildIdsQuery(ids);
   const setSync = (t) => { const el = document.getElementById('sync'); if (el && location.hash === hash) el.textContent = t; };
-  if (!q) return;
+  if (!ids.length) return;
   setSync('Actualizando precios…');
-  try {
-    await api({ q, pageSize: String(Math.min(ids.length, 250)) });
-    save();
-    if ((location.hash || '#/') === hash) {
-      $app.innerHTML = viewCollection() + tabs('coleccion');
-      setSync('Precios actualizados ahora');
-    }
-  } catch {
-    setSync('Sin conexión: mostrando los últimos precios guardados');
+  const { ok, failed } = await loadCards(ids, state.cards);
+  if (!ok) { setSync('Sin conexión: mostrando los últimos precios guardados'); return; }
+  save();
+  if ((location.hash || '#/') === hash) {
+    $app.innerHTML = viewCollection() + tabs('coleccion');
+    setSync(failed ? `Precios actualizados (${ok} de ${ids.length})` : 'Precios actualizados ahora');
   }
 }
 
@@ -309,23 +281,24 @@ function onSearchInput(e) {
   const text = e.target.value;
   state.search.text = text;
   clearTimeout(searchTimer);
-  const q = buildQuery(text);
-  if (!q) { state.search = { text, results: null, status: 'idle' }; paintResults(); return; }
+  const parsed = parseSearchText(text);
+  if (!parsed) { state.search = { text, results: null, status: 'idle' }; paintResults(); return; }
   searchTimer = setTimeout(async () => {
     const seq = ++searchSeq;
     state.search.status = 'loading';
     paintResults();
     try {
-      const data = await api({ q, pageSize: '30', orderBy: '-set.releaseDate' });
+      const { cards, total } = await searchByName(parsed.name, { number: parsed.number, cache: state.cards });
       if (seq !== searchSeq) return;
-      state.search.results = data;
+      state.search.results = cards;
+      state.search.total = total;
       state.search.status = 'ok';
     } catch {
       if (seq !== searchSeq) return;
       state.search.status = 'error';
     }
     paintResults();
-  }, 350);
+  }, 400);
 }
 function paintResults() {
   const el = document.getElementById('results');
@@ -372,26 +345,26 @@ async function scanFile(file) {
   }
   if (seq !== scanSeq) return;
   const parsed = parseCardText(text);
-  const queries = buildScanQueries(parsed);
   const info = [parsed.number ? `${parsed.number}/${parsed.total}` : null, parsed.names[0]].filter(Boolean).join(' · ');
-  if (!queries.length) return fail('No pude leer el nombre ni el número. Prueba con más luz, la carta plana y más cerca.');
-  // Prueba las consultas de más a menos selectiva; si una falla en el servidor, sigue con la siguiente.
-  let data = null;
-  let failed = 0;
-  for (const q of queries) {
-    try {
-      const res = await api({ q, pageSize: '30' }, { timeout: 20000 });
+  if (!parsed.names.length && !(parsed.number && parsed.total)) return fail('No pude leer el nombre ni el número. Prueba con más luz, la carta plana y más cerca.');
+  // 1) por nombre en varios idiomas (la carta puede estar en alemán, español…); 2) por número y total impreso.
+  let data = [];
+  let netFail = false;
+  try {
+    for (const name of parsed.names.slice(0, 2)) {
+      data = (await searchByName(name, { langs: CONFIG.scanLangs, number: parsed.number, cache: state.cards })).cards;
       if (seq !== scanSeq) return;
-      if (res.length) { data = res; break; }
-    } catch {
-      failed++;
+      if (data.length) break;
     }
+  } catch { netFail = true; }
+  if (!data.length && parsed.number && parsed.total) {
+    try { data = await findByNumber(parsed.number, parsed.total, { cache: state.cards }); netFail = false; } catch { netFail = true; }
   }
   if (seq !== scanSeq) return;
-  if (!data && failed === queries.length) {
-    return fail(`Leí la carta (${info || 'sin datos claros'}) pero pokemontcg.io no respondió: ${state.lastApiError ?? 'sin conexión'}. Inténtalo de nuevo o usa Buscar.`);
+  if (!data.length && netFail) {
+    return fail(`Leí la carta (${info || 'sin datos claros'}) pero TCGdex no respondió: ${net.lastError ?? 'sin conexión'}. Inténtalo de nuevo o usa Buscar.`);
   }
-  Object.assign(sc, { status: 'done', msg: '', info, results: rankMatches(data ?? [], text) });
+  Object.assign(sc, { status: 'done', msg: '', info, results: rankMatches(data, text) });
   paintScan(true);
 }
 
@@ -417,11 +390,11 @@ let checking = false;
 async function checkAllAlerts() {
   if (checking) return;
   const pending = Object.keys(state.alerts);
-  const q = buildIdsQuery(pending);
-  if (!q) return;
+  if (!pending.length) return;
   checking = true;
   try {
-    await api({ q, pageSize: String(Math.min(pending.length, 250)) });
+    const { ok } = await loadCards(pending, state.cards);
+    if (!ok) return;
     const fired = applyAlertCheck();
     save();
     const route = location.hash || '#/';

@@ -107,3 +107,44 @@ test('buildScanQueries ordena de más a menos selectiva', () => {
   assert.deepEqual(buildScanQueries({ number: '23', total: 165, names: [] }), ['number:23 set.printedTotal:165']);
   assert.deepEqual(buildScanQueries({ number: null, total: null, names: [] }), []);
 });
+
+import { normalizeCard, parseSearchText, sameNumber, numberVariants } from '../src/lib.js';
+
+const CM = { updated: '2026-09-30T09:52:39.658Z', unit: 'EUR', idProduct: 511535, avg: 0.12, low: 0.02, trend: 0.17, avg1: 0.12, avg7: 0.09, avg30: 0.12, 'trend-holo': 0.77, 'avg-holo': 0.68, 'low-holo': 0.02, 'avg1-holo': 2.5, 'avg7-holo': 1.27, 'avg30-holo': 0.63 };
+const TP = { unit: 'USD', updated: '2026-09-30T09:52:54.019Z', normal: { productId: 226392, lowPrice: 0.01, midPrice: 0.29, highPrice: 25, marketPrice: 0.27, directLowPrice: null }, 'reverse-holofoil': { productId: 226392, lowPrice: 0.1, midPrice: 0.52, highPrice: 19.84, marketPrice: 0.5 } };
+const RAW = { id: 'swsh4-23', localId: '23', name: 'Charmander', image: 'https://assets.tcgdex.net/es/swsh/swsh4/23', set: { name: 'Voltaje Vívido', cardCount: { official: 185, total: 203 } }, pricing: { cardmarket: CM, tcgplayer: TP } };
+
+test('normalizeCard traduce la ficha de TCGdex a la forma interna', () => {
+  const c = normalizeCard(RAW);
+  assert.equal(c.id, 'swsh4-23');
+  assert.equal(c.number, '23');
+  assert.equal(c.set.printedTotal, 185);
+  assert.equal(c.images.small, 'https://assets.tcgdex.net/es/swsh/swsh4/23/low.webp');
+  assert.equal(c.cardmarket.prices.trendPrice, 0.17);
+  assert.equal(c.cardmarket.prices.avg7, 0.09);
+  assert.equal(c.cardmarket.updatedAt, '2026-09-30T09:52:39.658Z');
+  assert.equal(c.tcgplayer.prices.normal.market, 0.27);
+  assert.equal(c.tcgplayer.url, 'https://www.tcgplayer.com/product/226392');
+  assert.equal(cardValue(c), 0.17);
+});
+
+test('normalizeCard usa los precios holo si no hay tendencia normal y tolera cartas sin precios ni imagen', () => {
+  const holoOnly = normalizeCard({ ...RAW, pricing: { cardmarket: { ...CM, trend: null, avg: null, low: null } } });
+  assert.equal(holoOnly.cardmarket.prices.trendPrice, 0.77);
+  assert.equal(cardValue(holoOnly), 0.77);
+  const bare = normalizeCard({ id: 'x-1', localId: '1', name: 'X' });
+  assert.equal(cardValue(bare), null);
+  assert.deepEqual(bare.images, {});
+  assert.equal(bare.cardmarket, undefined);
+  assert.equal(normalizeCard(null), null);
+});
+
+test('parseSearchText y sameNumber/numberVariants', () => {
+  assert.deepEqual(parseSearchText('charizard 199/165'), { name: 'charizard', number: '199' });
+  assert.deepEqual(parseSearchText('  Mr. Mime '), { name: 'Mr. Mime', number: null });
+  assert.equal(parseSearchText('a'), null);
+  assert.equal(sameNumber('023', '23'), true);
+  assert.equal(sameNumber('SWSH092', '92'), false);
+  assert.deepEqual(numberVariants('4'), ['4', '04', '004']);
+  assert.deepEqual(numberVariants('123'), ['123']);
+});

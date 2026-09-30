@@ -148,3 +148,63 @@ export function buildScanQueries(parsed) {
   if (nameQ) qs.push(nameQ);
   return qs;
 }
+
+// ---------- TCGdex ----------
+
+/** Convierte una carta de TCGdex (api.tcgdex.net/v2) a la forma interna que usa la app. */
+export function normalizeCard(raw) {
+  if (!raw?.id) return null;
+  const cm = raw.pricing?.cardmarket;
+  // Cartas solo holo: la tendencia normal viene vacía y los precios están en los campos «-holo».
+  const holo = !!cm && cm.trend == null && cm['trend-holo'] != null;
+  const pick = (k) => (cm ? (holo ? cm[`${k}-holo`] : cm[k]) ?? null : null);
+  const tp = raw.pricing?.tcgplayer;
+  const finishes = {};
+  let productId = null;
+  if (tp) {
+    for (const [name, v] of Object.entries(tp)) {
+      if (v && typeof v === 'object' && 'marketPrice' in v) {
+        finishes[name] = { low: v.lowPrice ?? null, mid: v.midPrice ?? null, high: v.highPrice ?? null, market: v.marketPrice ?? null };
+        productId ??= v.productId ?? null;
+      }
+    }
+  }
+  return {
+    src: 'tcgdex',
+    id: raw.id,
+    name: raw.name,
+    number: raw.localId,
+    set: { name: raw.set?.name, printedTotal: raw.set?.cardCount?.official ?? null },
+    images: raw.image ? { small: `${raw.image}/low.webp`, large: `${raw.image}/high.webp` } : {},
+    cardmarket: cm
+      ? {
+          updatedAt: cm.updated,
+          url: `https://www.cardmarket.com/es/Pokemon/Products/Search?searchString=${encodeURIComponent(raw.name ?? '')}`,
+          prices: { trendPrice: pick('trend'), averageSellPrice: pick('avg'), lowPrice: pick('low'), avg1: pick('avg1'), avg7: pick('avg7'), avg30: pick('avg30') },
+        }
+      : undefined,
+    tcgplayer: tp ? { updatedAt: tp.updated, url: productId ? `https://www.tcgplayer.com/product/${productId}` : undefined, prices: finishes } : undefined,
+  };
+}
+
+/** "charizard 199" -> {name:'charizard', number:'199'}; null si hay menos de 2 letras. */
+export function parseSearchText(text) {
+  const t = String(text ?? '').trim().replace(/\s+/g, ' ');
+  const m = t.match(/^(.*?)\s+(\d{1,3})(?:\/\d+)?$/);
+  const name = (m && m[1] ? m[1] : t).trim();
+  if (name.length < 2) return null;
+  return { name, number: m && m[1] ? m[2] : null };
+}
+
+/** ¿Es el mismo número de carta aunque venga con ceros ("023" y "23")? */
+export function sameNumber(localId, n) {
+  const a = parseInt(String(localId), 10);
+  const b = parseInt(String(n), 10);
+  return Number.isFinite(a) && Number.isFinite(b) && a === b && /^\d+$/.test(String(localId));
+}
+
+/** Formas en que TCGdex puede guardar el número: "4", "04", "004". */
+export function numberVariants(n) {
+  const v = String(parseInt(String(n), 10));
+  return [...new Set([v, v.padStart(2, '0'), v.padStart(3, '0')])];
+}
