@@ -28,23 +28,28 @@ function save() {
   } catch { /* almacenamiento no disponible: la app sigue funcionando en memoria */ }
 }
 
-async function api(params) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30000);
-  try {
-    const headers = CONFIG.apiKey ? { 'X-Api-Key': CONFIG.apiKey } : {};
-    const res = await fetch(`${CONFIG.apiBase}/cards?${new URLSearchParams({ select: SELECT, ...params })}`, { headers, signal: ctrl.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    for (const c of json.data) state.cards[c.id] = c;
-    return json.data;
-  } catch (err) {
-    const reason = err.name === 'AbortError' ? 'tiempo agotado (30 s)' : err.message;
-    console.error('pokemontcg.io:', reason, err);
-    state.lastApiError = reason;
-    throw err;
-  } finally {
-    clearTimeout(timer);
+async function api(params, { retry = false } = {}) {
+  const attempts = retry ? 2 : 1;
+  for (let i = 1; i <= attempts; i++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    try {
+      const headers = CONFIG.apiKey ? { 'X-Api-Key': CONFIG.apiKey } : {};
+      const res = await fetch(`${CONFIG.apiBase}/cards?${new URLSearchParams({ select: SELECT, ...params })}`, { headers, signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      for (const c of json.data) state.cards[c.id] = c;
+      return json.data;
+    } catch (err) {
+      const reason = err.name === 'AbortError' ? 'tiempo agotado (30 s)' : err.message;
+      console.error('pokemontcg.io:', reason, err);
+      state.lastApiError = reason;
+      // Reintenta una vez si es un fallo del servidor o de red (pokemontcg.io a veces da 504 / se cuelga).
+      const transient = err.name === 'AbortError' || err.name === 'TypeError' || /^HTTP 5/.test(err.message);
+      if (i === attempts || !transient) throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
 
@@ -371,12 +376,12 @@ async function scanFile(file) {
   const info = [parsed.number ? `${parsed.number}/${parsed.total}` : null, parsed.names[0]].filter(Boolean).join(' · ');
   if (!q) return fail('No pude leer el nombre ni el número. Prueba con más luz, la carta plana y más cerca.');
   try {
-    let data = await api({ q, pageSize: '40' });
-    if (!data.length && parsed.names.length) data = await api({ q: buildQuery(parsed.names[0]), pageSize: '40' });
+    let data = await api({ q, pageSize: '40' }, { retry: true });
+    if (!data.length && parsed.names.length) data = await api({ q: buildQuery(parsed.names[0]), pageSize: '40' }, { retry: true });
     if (seq !== scanSeq) return;
     Object.assign(sc, { status: 'done', msg: '', info, results: rankMatches(data, text) });
   } catch {
-    return fail('Leí la carta pero no pude consultar pokemontcg.io. Inténtalo de nuevo.');
+    return fail(`Leí la carta (${info || 'sin datos claros'}) pero pokemontcg.io no respondió: ${state.lastApiError ?? 'sin conexión'}. Inténtalo de nuevo o usa Buscar.`);
   }
   paintScan(true);
 }
