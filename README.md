@@ -16,11 +16,11 @@ No incluye todavía: visor de cámara en vivo, reconocimiento por imagen (solo O
 ## Usar
 
 ```bash
-npm start     # http://localhost:8080  (sirve los ficheros estáticos; no hay build)
+npm start     # http://localhost:8080  (servidor estático de Node; no hay build)
 npm test      # pruebas de la lógica pura (node:test)
 ```
 
-Sin dependencias. Los módulos ES necesitan servirse por HTTP, no abrir `index.html` con doble clic.
+Sin dependencias (solo Node). Los módulos ES necesitan servirse por HTTP, no abrir `index.html` con doble clic.
 
 ## Notas
 

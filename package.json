@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Consulta el precio de cartas Pokémon (datos de pokemontcg.io)",
   "scripts": {
-    "start": "python3 -m http.server 8080",
+    "start": "node server.js",
     "test": "node --test"
   }
 }
