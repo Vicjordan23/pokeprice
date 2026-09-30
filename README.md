@@ -11,7 +11,7 @@ Datos de precios vía [pokemontcg.io](https://docs.pokemontcg.io/) (Cardmarket e
 - **Alertas:** desde la ficha eliges «baje de» o «suba de» un importe. Se comprueban al abrir la app, al volver a ella y cada 15 minutos **mientras está abierta**; si se cumplen, aparece un contador en la pestaña Alertas y, si activas los avisos del navegador, una notificación. Con la app cerrada no hay avisos: eso requiere un servidor (ver «Siguientes pasos»).
 - **Colección:** guarda cartas en el navegador (localStorage), suma su valor y refresca los precios al abrir.
 
-No incluye todavía: visor de cámara en vivo, reconocimiento por imagen (solo OCR de texto), precios por estado (NM/LP…), cartas gradadas ni alertas. La API gratuita no da esos datos.
+No incluye todavía: visor de cámara en vivo, reconocimiento por imagen (solo OCR de texto), precios por estado (NM/LP…), cartas gradadas ni avisos con la app cerrada. La API gratuita no da precios por estado ni gradadas.
 
 ## Usar
 
