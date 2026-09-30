@@ -5,6 +5,7 @@ Datos de precios vía [pokemontcg.io](https://docs.pokemontcg.io/) (Cardmarket e
 
 ## Qué hace
 
+- **Temas:** tres estilos futuristas (neón cian, ultravioleta, aurora) con Pokémon de fondo; se cambian con los círculos de arriba a la derecha y se recuerdan. Las ilustraciones se cargan del repositorio público de PokéAPI (solo decoración; si no cargan, se ocultan).
 - **Buscar:** por nombre (y número opcional: `charizard 199`).
 - **Ficha:** precio de tendencia de Cardmarket, variación 7d/30d, mini-gráfica con las medias de 30d, 7d y 1d, y precios por mercado.
 - **Escanear:** haces una foto (o eliges una imagen), un OCR en el navegador ([Tesseract.js](https://github.com/naptha/tesseract.js), se descarga de jsDelivr al primer uso) lee el número de carta (`199/165`) y el nombre, y se buscan candidatos en pokemontcg.io. La foto no se sube a ningún servidor. Funciona mejor con cartas en inglés y buena luz; con otro idioma se apoya en el número.

@@ -222,9 +222,9 @@ function chartSvg(pts) {
   const span = max - min || 1;
   const xy = pts.map((p, i) => [pad + (i * (W - 2 * pad)) / (pts.length - 1), H - pad - ((p.value - min) / span) * (H - 2 * pad)]);
   const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const dots = xy.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#C2410C"/>`).join('');
+  const dots = xy.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="currentColor"/>`).join('');
   const labels = pts.map((p) => `<span>${p.label}<b>${money(p.value)}</b></span>`).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Evolución del precio: ${pts.map((p) => `${p.label} ${money(p.value)}`).join(', ')}"><polyline fill="none" stroke="#C2410C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${line}"/>${dots}</svg><div class="axis">${labels}</div>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Evolución del precio: ${pts.map((p) => `${p.label} ${money(p.value)}`).join(', ')}"><polyline fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${line}"/>${dots}</svg><div class="axis">${labels}</div>`;
 }
 
 function tabs(route) {
