@@ -56,3 +56,11 @@ a{color:inherit}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .filebtn:has(+ .sr-only:focus-visible){outline:2px solid var(--ink);outline-offset:2px}
 .scan-prev{display:block;width:120px;border-radius:10px;margin:14px auto 0}
+.two{display:flex;gap:12px}.two>div{flex:1}
+select,.panel input{width:100%;height:44px;border-radius:12px;border:1px solid #D9CFBC;background:#fff;font:inherit;font-size:16px;padding:0 10px;color:var(--ink)}
+.btn.sm{height:44px;width:auto;padding:0 18px;font-size:14px}
+.btn.ghost{background:transparent;border:2px solid var(--ink);color:var(--ink)}
+.alert-hit{margin:6px 0}
+.row.hit{border-color:var(--up)}
+.dot{margin-left:6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.tabs a{font-size:13px}

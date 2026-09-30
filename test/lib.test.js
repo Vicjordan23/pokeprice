@@ -65,3 +65,33 @@ test('rankMatches pone primero el nombre presente en el texto', () => {
   const cards = [{ name: 'Pikachu' }, { name: 'Charizard ex' }, { name: 'Charizard' }];
   assert.deepEqual(rankMatches(cards, 'CHARIZARD ex HP 330').map((c) => c.name), ['Charizard ex', 'Charizard', 'Pikachu']);
 });
+
+import { parseTarget, alertHit, checkAlerts } from '../src/lib.js';
+
+test('parseTarget entiende formatos españoles y punto decimal', () => {
+  assert.equal(parseTarget('96,4'), 96.4);
+  assert.equal(parseTarget('1.250,50 €'), 1250.5);
+  assert.equal(parseTarget('1.250'), 1250);
+  assert.equal(parseTarget('96.4'), 96.4);
+  assert.equal(parseTarget('abc'), null);
+  assert.equal(parseTarget('0'), null);
+  assert.equal(parseTarget(''), null);
+});
+
+test('alertHit según dirección', () => {
+  assert.equal(alertHit({ dir: 'below', target: 100 }, 100), true);
+  assert.equal(alertHit({ dir: 'below', target: 100 }, 101), false);
+  assert.equal(alertHit({ dir: 'above', target: 100 }, 100), true);
+  assert.equal(alertHit({ dir: 'above', target: 100 }, null), false);
+});
+
+test('checkAlerts dispara una vez y no muta', () => {
+  const alerts = { a: { dir: 'below', target: 100, triggered: null }, b: { dir: 'above', target: 50, triggered: null }, c: { dir: 'below', target: 100, triggered: { at: 1, value: 90 } } };
+  const cards = { a: card({ trendPrice: 90 }), b: card({ trendPrice: 40 }), c: card({ trendPrice: 80 }) };
+  const r = checkAlerts(alerts, cards, 123);
+  assert.deepEqual(r.fired, ['a']);
+  assert.deepEqual(r.alerts.a.triggered, { at: 123, value: 90 });
+  assert.equal(r.alerts.b.triggered, null);
+  assert.equal(r.alerts.c.triggered.at, 1);
+  assert.equal(alerts.a.triggered, null);
+});

@@ -1,16 +1,18 @@
-import { cardValue, changePct, chartPoints, buildQuery, buildIdsQuery, collectionTotal, esc, parseCardText, buildScanQuery, rankMatches } from './lib.js';
+import { cardValue, changePct, chartPoints, buildQuery, buildIdsQuery, collectionTotal, esc, parseCardText, buildScanQuery, rankMatches, parseTarget, checkAlerts } from './lib.js';
 import { CONFIG } from './config.js';
 
 const SELECT = 'id,name,number,rarity,set,images,tcgplayer,cardmarket';
 const KEY_OWNED = 'pokeprice.owned.v1';
 const KEY_CARDS = 'pokeprice.cards.v1';
+const KEY_ALERTS = 'pokeprice.alerts.v1';
+const CHECK_EVERY_MS = 15 * 60 * 1000;
 
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 const usd = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD' });
 const pctFmt = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 const $app = document.getElementById('app');
-const state = { cards: load(KEY_CARDS, {}), owned: load(KEY_OWNED, {}), search: { text: '', results: null, status: 'idle' }, scan: { status: 'idle', msg: '', preview: null, info: '', results: null } };
+const state = { cards: load(KEY_CARDS, {}), owned: load(KEY_OWNED, {}), alerts: load(KEY_ALERTS, {}), alertForm: null, alertErr: '', search: { text: '', results: null, status: 'idle' }, scan: { status: 'idle', msg: '', preview: null, info: '', results: null } };
 
 function load(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -18,9 +20,10 @@ function load(key, fallback) {
 function save() {
   try {
     localStorage.setItem(KEY_OWNED, JSON.stringify(state.owned));
-    // Solo guardamos instantáneas de las cartas de la colección.
+    localStorage.setItem(KEY_ALERTS, JSON.stringify(state.alerts));
+    // Solo guardamos instantáneas de las cartas de la colección y de las alertas.
     const keep = {};
-    for (const id of Object.keys(state.owned)) if (state.cards[id]) keep[id] = state.cards[id];
+    for (const id of [...Object.keys(state.owned), ...Object.keys(state.alerts)]) if (state.cards[id]) keep[id] = state.cards[id];
     localStorage.setItem(KEY_CARDS, JSON.stringify(keep));
   } catch { /* almacenamiento no disponible: la app sigue funcionando en memoria */ }
 }
@@ -140,7 +143,57 @@ function viewDetail(id) {
       <small class="src">Datos vía pokemontcg.io. Cardmarket actualizado: ${esc(dateEs(card.cardmarket?.updatedAt)) || 'n/d'}. Son medias, no el precio en tiempo real.</small>
       <div class="links">${linkTo(card.cardmarket?.url, 'Ver en Cardmarket')}${linkTo(card.tcgplayer?.url, 'Ver en TCGplayer')}</div>
     </section>
+    ${alertPanel(id, card)}
     <div class="bar"><button class="btn ${owned ? 'sec' : 'pri'}" data-action="toggle" data-id="${esc(id)}">${owned ? 'Quitar de mi colección' : 'Añadir a mi colección'}</button></div>`;
+}
+
+const fmtDate = (ts) => new Date(ts).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' });
+const alertText = (a) => `${a.dir === 'above' ? 'Sube de' : 'Baja de'} ${money(a.target)}`;
+
+function alertPanel(id, card) {
+  const a = state.alerts[id];
+  const value = cardValue(card);
+  let body;
+  if (state.alertForm === id) {
+    body = `<form id="alert-form" data-id="${esc(id)}" novalidate>
+      <div class="two">
+        <div><label for="a-dir" class="lbl">Avísame cuando</label>
+          <select id="a-dir" name="dir"><option value="below">baje de</option><option value="above">suba de</option></select></div>
+        <div><label for="a-target" class="lbl">Precio (€)</label>
+          <input id="a-target" name="target" inputmode="decimal" autocomplete="off" value="${value != null ? esc(String(value).replace('.', ',')) : ''}"></div>
+      </div>
+      ${state.alertErr ? `<p class="error" role="alert">${esc(state.alertErr)}</p>` : ''}
+      <div class="links"><button class="btn pri sm" type="submit">Guardar alerta</button><button class="btn ghost sm" type="button" data-action="alert-cancel">Cancelar</button></div>
+    </form>`;
+  } else if (a?.triggered) {
+    body = `<p class="alert-hit"><b>Disparada</b> · ${alertText(a)}: llegó a ${money(a.triggered.value)} (${esc(fmtDate(a.triggered.at))})</p>
+      <div class="links"><button class="btn pri sm" data-action="alert-rearm" data-id="${esc(id)}">Volver a activar</button><button class="btn ghost sm" data-action="alert-del" data-id="${esc(id)}">Eliminar</button></div>`;
+  } else if (a) {
+    body = `<p>${alertText(a)} · ahora ${money(value)}</p>
+      <div class="links"><button class="btn ghost sm" data-action="alert-del" data-id="${esc(id)}">Eliminar alerta</button></div>`;
+  } else {
+    body = `<p class="hint">Te aviso cuando el precio de tendencia cruce el importe que elijas.</p>
+      <div class="links"><button class="btn ghost sm" data-action="alert-open" data-id="${esc(id)}">Crear alerta</button></div>`;
+  }
+  return `<section class="panel"><b>Alerta de precio</b>${body}</section>`;
+}
+
+function viewAlerts() {
+  const entries = Object.entries(state.alerts).filter(([id]) => state.cards[id]);
+  const canNotify = 'Notification' in window && Notification.permission === 'default';
+  const rows = entries
+    .sort(([, x], [, y]) => (y.triggered ? 1 : 0) - (x.triggered ? 1 : 0))
+    .map(([id, a]) => {
+      const c = state.cards[id];
+      const status = a.triggered ? `<small class="up">Disparada · ${money(a.triggered.value)}</small>` : `<small>Ahora ${money(cardValue(c))}</small>`;
+      return `<a class="row${a.triggered ? ' hit' : ''}" href="#/carta/${esc(id)}">${thumb(c)}
+        <span class="grow"><b>${esc(c.name)}</b><small>${esc(c.set?.name)} · ${esc(c.number)}</small></span>
+        <span class="right"><b>${alertText(a)}</b>${status}</span></a>`;
+    }).join('');
+  return `<header class="top"><h1>Alertas</h1></header>
+    <p class="hint">Se comprueban cada 15 minutos <b>mientras la app está abierta</b>. Con la app cerrada no se envían avisos: eso necesitaría un servidor.</p>
+    ${canNotify ? '<button class="btn ghost sm" data-action="notif">Activar avisos del navegador</button>' : ''}
+    ${rows ? `<div class="list" style="margin-top:12px">${rows}</div>` : '<p class="empty">No tienes alertas. Crea una desde la ficha de una carta.</p>'}`;
 }
 
 function tcgRows(card) {
@@ -171,7 +224,8 @@ function chartSvg(pts) {
 
 function tabs(route) {
   const on = (r) => (route === r ? ' on' : '');
-  return `<nav class="tabs"><a class="${on('coleccion').trim()}" href="#/">Colección</a><a class="${on('escanear').trim()}" href="#/escanear">Escanear</a><a class="${on('buscar').trim()}" href="#/buscar">Buscar</a></nav>`;
+  const hits = Object.values(state.alerts).filter((a) => a.triggered).length;
+  return `<nav class="tabs"><a class="${on('coleccion').trim()}" href="#/">Colección</a><a class="${on('escanear').trim()}" href="#/escanear">Escanear</a><a class="${on('buscar').trim()}" href="#/buscar">Buscar</a><a class="${on('alertas').trim()}" href="#/alertas">Alertas${hits ? `<span class="dot" aria-label="${hits} disparadas">${hits}</span>` : ''}</a></nav>`;
 }
 
 // ---------- Router ----------
@@ -181,7 +235,7 @@ let prevHash = '#/';
 async function render() {
   const hash = location.hash || '#/';
   const m = hash.match(/^#\/carta\/([\w.-]+)$/);
-  const route = m ? 'carta' : hash.startsWith('#/buscar') ? 'buscar' : hash.startsWith('#/escanear') ? 'escanear' : 'coleccion';
+  const route = m ? 'carta' : hash.startsWith('#/buscar') ? 'buscar' : hash.startsWith('#/escanear') ? 'escanear' : hash.startsWith('#/alertas') ? 'alertas' : 'coleccion';
   if (route !== 'carta') prevHash = hash;
   window.scrollTo(0, 0);
 
@@ -196,6 +250,12 @@ async function render() {
       }
       if (location.hash === hash) $app.innerHTML = viewDetail(m[1]);
     }
+    return;
+  }
+
+  if (route === 'alertas') {
+    $app.innerHTML = viewAlerts() + tabs('alertas');
+    checkAllAlerts();
     return;
   }
 
@@ -315,6 +375,62 @@ async function scanFile(file) {
   paintScan(true);
 }
 
+// ---------- Alertas: comprobación ----------
+
+function notify(ids) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  for (const id of ids) {
+    const a = state.alerts[id], c = state.cards[id];
+    if (!a || !c) continue;
+    try { new Notification('PokéPrice', { body: `${c.name}: ${alertText(a)} → ${money(a.triggered.value)}` }); } catch { /* algunos móviles exigen service worker */ }
+  }
+}
+
+function applyAlertCheck() {
+  const r = checkAlerts(state.alerts, state.cards);
+  state.alerts = r.alerts;
+  if (r.fired.length) { save(); notify(r.fired); }
+  return r.fired;
+}
+
+let checking = false;
+async function checkAllAlerts() {
+  if (checking) return;
+  const pending = Object.keys(state.alerts);
+  const q = buildIdsQuery(pending);
+  if (!q) return;
+  checking = true;
+  try {
+    await api({ q, pageSize: String(Math.min(pending.length, 250)) });
+    const fired = applyAlertCheck();
+    save();
+    const route = location.hash || '#/';
+    if (route.startsWith('#/alertas')) $app.innerHTML = viewAlerts() + tabs('alertas');
+    else if (fired.length) {
+      // Solo actualizamos la pestaña (contador), sin tocar la vista en curso.
+      const nav = document.querySelector('.tabs');
+      const tab = route.startsWith('#/buscar') ? 'buscar' : route.startsWith('#/escanear') ? 'escanear' : 'coleccion';
+      if (nav) { const tmp = document.createElement('div'); tmp.innerHTML = tabs(tab); nav.replaceWith(tmp.firstElementChild); }
+    }
+  } catch { /* sin conexión: se reintenta en el próximo ciclo */ } finally { checking = false; }
+}
+
+setInterval(checkAllAlerts, CHECK_EVERY_MS);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkAllAlerts(); });
+
+document.addEventListener('submit', (e) => {
+  if (e.target.id !== 'alert-form') return;
+  e.preventDefault();
+  const id = e.target.dataset.id;
+  const target = parseTarget(e.target.elements.target.value);
+  if (target == null) { state.alertErr = 'Escribe un importe válido, por ejemplo 250 o 96,40.'; render(); return; }
+  state.alerts[id] = { dir: e.target.elements.dir.value === 'above' ? 'above' : 'below', target, createdAt: Date.now(), triggered: null };
+  state.alertForm = null; state.alertErr = '';
+  applyAlertCheck();
+  save();
+  render();
+});
+
 document.addEventListener('change', (e) => {
   if (e.target.id === 'scan-file' && e.target.files?.[0]) scanFile(e.target.files[0]);
 });
@@ -323,6 +439,12 @@ document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   if (btn.dataset.action === 'back') location.hash = prevHash;
+  const act = btn.dataset.action;
+  if (act === 'alert-open') { state.alertForm = btn.dataset.id; state.alertErr = ''; render(); }
+  if (act === 'alert-cancel') { state.alertForm = null; state.alertErr = ''; render(); }
+  if (act === 'alert-del') { delete state.alerts[btn.dataset.id]; save(); render(); }
+  if (act === 'alert-rearm') { const a = state.alerts[btn.dataset.id]; if (a) { a.triggered = null; applyAlertCheck(); save(); render(); } }
+  if (act === 'notif') Notification.requestPermission().then(() => render());
   if (btn.dataset.action === 'toggle') {
     const id = btn.dataset.id;
     if (state.owned[id] > 0) delete state.owned[id]; else state.owned[id] = 1;

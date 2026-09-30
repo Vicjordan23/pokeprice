@@ -99,3 +99,39 @@ export function rankMatches(cards, text) {
   };
   return cards.map((c, i) => ({ c, i, s: score(c) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.c);
 }
+
+// ---------- Alertas de precio ----------
+
+/** Lee un importe escrito a la española ("1.250,50", "96,4") o con punto decimal ("96.4"). */
+export function parseTarget(text) {
+  let t = String(text ?? '').replace(/[\s€]/g, '');
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  if (!/^\d+(\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  return n > 0 ? n : null;
+}
+
+/** ¿Se cumple la alerta {dir:'below'|'above', target} con este valor? */
+export function alertHit(alert, value) {
+  if (value == null || !alert) return false;
+  return alert.dir === 'above' ? value >= alert.target : value <= alert.target;
+}
+
+/**
+ * Evalúa las alertas activas (sin `triggered`) con los precios actuales.
+ * No muta: devuelve las alertas nuevas y los ids que se han disparado ahora.
+ */
+export function checkAlerts(alerts, cards, now = Date.now()) {
+  const next = {};
+  const fired = [];
+  for (const [id, a] of Object.entries(alerts)) {
+    const value = cardValue(cards[id]);
+    if (!a.triggered && alertHit(a, value)) {
+      next[id] = { ...a, triggered: { at: now, value } };
+      fired.push(id);
+    } else next[id] = a;
+  }
+  return { alerts: next, fired };
+}
