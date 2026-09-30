@@ -88,9 +88,13 @@ function viewScan() {
   const sc = state.scan;
   const busy = sc.status === 'working';
   return `<header class="top"><h1>Escanear carta</h1></header>
-    <p class="hint">Haz una foto a la carta, plana, con buena luz y que se vea el nombre y el número de abajo (por ejemplo 199/165). Todo se lee en tu móvil; la foto no se sube a ningún sitio.</p>
-    <label class="btn pri filebtn${busy ? ' disabled' : ''}" for="scan-file">${busy ? 'Leyendo…' : 'Hacer foto o elegir imagen'}</label>
-    <input id="scan-file" class="sr-only" type="file" accept="image/*" capture="environment" ${busy ? 'disabled' : ''}>
+    <p class="hint">Haz una foto (o elige una de tu galería) con la carta plana, bien iluminada y ocupando casi toda la imagen. Tiene que verse el nombre y el número de abajo (por ejemplo 199/165). Todo se lee en tu móvil; la foto no se sube a ningún sitio.</p>
+    <div class="two">
+      <label class="btn pri filebtn${busy ? ' disabled' : ''}" for="scan-cam">${busy ? 'Leyendo…' : 'Hacer foto'}</label>
+      <label class="btn ghost filebtn${busy ? ' disabled' : ''}" for="scan-file">Elegir de galería</label>
+    </div>
+    <input id="scan-cam" class="sr-only" type="file" accept="image/*" capture="environment" ${busy ? 'disabled' : ''}>
+    <input id="scan-file" class="sr-only" type="file" accept="image/*" ${busy ? 'disabled' : ''}>
     ${sc.preview ? `<img class="scan-prev" src="${esc(sc.preview)}" alt="Foto de la carta">` : ''}
     <div id="scan-out">${scanOut()}</div>`;
 }
@@ -98,7 +102,8 @@ function viewScan() {
 function scanOut() {
   const sc = state.scan;
   const msg = sc.msg ? `<p class="empty ${sc.status === 'error' ? 'error' : ''}" ${sc.status === 'error' ? 'role="alert"' : ''}>${esc(sc.msg)}</p>` : '';
-  const info = sc.info ? `<small class="src">Leído: ${esc(sc.info)}</small>` : '';
+  const raw = sc.raw ? `<details class="raw"><summary>Texto leído de la foto</summary><pre>${esc(sc.raw.slice(0, 400))}</pre></details>` : '';
+  const info = (sc.info ? `<small class="src">Leído: ${esc(sc.info)}</small>` : '') + raw;
   if (!sc.results) return msg + info;
   if (!sc.results.length) return `${msg || '<p class="empty">No encontré ninguna carta con lo leído.</p>'}${info}`;
   return `<h2>Posibles coincidencias</h2><div class="list">${sc.results.slice(0, 8).map(cardRow).join('')}</div>${info}<small class="src">Comprueba que sea la tuya antes de añadirla.</small>`;
@@ -323,27 +328,83 @@ async function toCanvas(file, max = 1600) {
   return canvas;
 }
 
-async function loadOcr() {
-  const mod = await import(/* @vite-ignore */ CONFIG.ocrModule);
-  return mod.default ?? mod;
+let ocrPromise = null;
+function loadOcr() {
+  // Un único lector reutilizable; modo de texto disperso (PSM 11) porque una carta no es una página de texto.
+  ocrPromise ??= (async () => {
+    const mod = await import(/* @vite-ignore */ CONFIG.ocrModule);
+    const T = mod.default ?? mod;
+    if (T.createWorker) {
+      const worker = await T.createWorker('eng');
+      await worker.setParameters({ tessedit_pageseg_mode: '11' });
+      return (canvas) => worker.recognize(canvas).then((r) => r.data.text);
+    }
+    return (canvas) => T.recognize(canvas, 'eng').then((r) => r.data.text);
+  })().catch((err) => { ocrPromise = null; throw err; });
+  return ocrPromise;
+}
+
+/** Escala de grises + estiramiento de contraste (ignora el 2 % más oscuro y más claro) y, si toca, giro. */
+function enhance(src, rotate = 0) {
+  const k = Math.min(2, 2200 / Math.max(src.width, src.height));
+  const w = Math.round(src.width * k), h = Math.round(src.height * k);
+  const c = document.createElement('canvas');
+  const swap = rotate % 180 !== 0;
+  c.width = swap ? h : w; c.height = swap ? w : h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.translate(c.width / 2, c.height / 2);
+  ctx.rotate((rotate * Math.PI) / 180);
+  ctx.drawImage(src, -w / 2, -h / 2, w, h);
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < d.length; i += 4) { const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0; d[i] = g; hist[g]++; }
+  const total = d.length / 4;
+  let lo = 0, hi = 255, acc = 0;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.02) { lo = v; break; } }
+  acc = 0;
+  for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= total * 0.02) { hi = v; break; } }
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < d.length; i += 4) { const g = Math.max(0, Math.min(255, ((d[i] - lo) * 255) / span)); d[i] = d[i + 1] = d[i + 2] = g; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+/** Lee la foto en varias pasadas y para en cuanto encuentra un número de carta verosímil. */
+async function readCard(canvas, onStep) {
+  const ocr = await loadOcr();
+  const passes = [
+    ['Leyendo la carta…', () => canvas],
+    ['Mejorando el contraste…', () => enhance(canvas)],
+    ['Probando la foto girada…', () => enhance(canvas, 90)],
+    ['Probando la foto girada al revés…', () => enhance(canvas, 270)],
+  ];
+  let all = '';
+  for (const [label, make] of passes) {
+    onStep(label);
+    all += '\n' + (await ocr(make()));
+    if (parseCardText(all).number) break;
+  }
+  return all.trim();
 }
 
 async function scanFile(file) {
   const seq = ++scanSeq;
   const sc = state.scan;
   if (sc.preview) URL.revokeObjectURL(sc.preview);
-  Object.assign(sc, { status: 'working', msg: 'Leyendo la carta… la primera vez descarga el lector de texto (unos segundos).', preview: URL.createObjectURL(file), info: '', results: null });
+  Object.assign(sc, { status: 'working', msg: 'Leyendo la carta… la primera vez descarga el lector de texto (unos segundos).', preview: URL.createObjectURL(file), info: '', raw: '', results: null });
   paintScan(true);
   const fail = (msg) => { if (seq === scanSeq) { Object.assign(sc, { status: 'error', msg, results: null }); paintScan(true); } };
   let text;
   try {
     const canvas = await toCanvas(file);
-    const T = await loadOcr();
-    text = (await T.recognize(canvas, 'eng')).data.text;
+    text = await readCard(canvas, (label) => { if (seq === scanSeq) { sc.msg = label; paintScan(false); } });
   } catch {
     return fail('No se pudo leer la imagen. Comprueba tu conexión (el lector de texto se descarga una vez) e inténtalo de nuevo.');
   }
   if (seq !== scanSeq) return;
+  sc.raw = text;
   const parsed = parseCardText(text);
   const info = [parsed.number ? `${parsed.number}/${parsed.total}` : null, parsed.names[0]].filter(Boolean).join(' · ');
   if (!parsed.names.length && !(parsed.number && parsed.total)) return fail('No pude leer el nombre ni el número. Prueba con más luz, la carta plana y más cerca.');
@@ -425,7 +486,11 @@ document.addEventListener('submit', (e) => {
 });
 
 document.addEventListener('change', (e) => {
-  if (e.target.id === 'scan-file' && e.target.files?.[0]) scanFile(e.target.files[0]);
+  if ((e.target.id === 'scan-file' || e.target.id === 'scan-cam') && e.target.files?.[0]) {
+    const f = e.target.files[0];
+    e.target.value = '';
+    scanFile(f);
+  }
 });
 
 document.addEventListener('click', (e) => {

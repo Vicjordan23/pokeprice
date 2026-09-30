@@ -29,8 +29,8 @@ async function getJson(url, { timeout = 15000, retry = true } = {}) {
 const cardsUrl = (lang) => `${CONFIG.apiBase}/${lang}/cards`;
 
 /** Ficha completa (con precios). Prueba español y luego inglés. */
-export async function getCard(id) {
-  for (const lang of ['es', 'en']) {
+export async function getCard(id, langs = ['es', 'en']) {
+  for (const lang of langs) {
     const card = normalizeCard(await getJson(`${cardsUrl(lang)}/${encodeURIComponent(id)}`));
     if (card) return card;
   }
@@ -89,14 +89,25 @@ export async function searchByName(name, { langs = ['es', 'en'], number = null, 
   return { cards, total };
 }
 
-/** Sin nombre legible: busca por número y se queda con las que tienen ese total impreso (p. ej. /165). */
-export async function findByNumber(number, printedTotal, { max = 40, cache } = {}) {
-  let list = [];
-  const found = await Promise.allSettled(numberVariants(number).map((v) => briefs('en', { localId: v })));
-  if (found.every((r) => r.status === 'rejected')) throw found[0].reason;
-  for (const r of found) if (r.status === 'fulfilled') list = list.concat(r.value);
-  const cards = (await mapLimit(list.slice(0, max), 6, (b) => getCard(b.id))).filter(Boolean);
-  const match = printedTotal ? cards.filter((c) => c.set?.printedTotal === printedTotal) : cards;
-  if (cache) match.forEach((c) => { cache[c.id] = c; });
-  return match;
+let setsCache = null;
+async function loadSets() {
+  if (!setsCache) {
+    const data = await getJson(`${CONFIG.apiBase}/en/sets`, { timeout: 15000 });
+    setsCache = Array.isArray(data) ? data : [];
+  }
+  return setsCache;
+}
+
+/**
+ * Busca por número y total impreso (p. ej. 26/197). En vez de mirar todas las cartas con ese número
+ * (hay cientos), localiza los sets cuyo total coincide y prueba sus ids ("<set>-<número>").
+ */
+export async function findByNumber(number, printedTotal, { max = 60, cache } = {}) {
+  const sets = await loadSets();
+  const official = sets.filter((s) => s.cardCount?.official === printedTotal);
+  const chosen = official.length ? official : sets.filter((s) => s.cardCount?.total === printedTotal);
+  const ids = chosen.flatMap((s) => numberVariants(number).map((v) => `${s.id}-${v}`)).slice(0, max);
+  const cards = (await mapLimit(ids, 6, (id) => getCard(id, ['en']))).filter(Boolean);
+  if (cache) cards.forEach((c) => { cache[c.id] = c; });
+  return cards;
 }

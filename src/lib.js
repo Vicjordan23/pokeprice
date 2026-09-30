@@ -71,15 +71,23 @@ const NOT_A_NAME = /^(basic|stage\s*\d|hp\b|pok[eé]mon|trainer|energy|supporter
  */
 export function parseCardText(text) {
   const t = String(text ?? '');
-  const m = t.match(/(\d{1,3})\s*\/\s*(\d{1,3})/);
+  // Todos los "N/M" del texto (el OCR a veces lee la barra como "|"). Se prefiere el primero con número <= total
+  // (lo normal); si no hay, uno con número algo mayor (cartas secretas, p. ej. 245/91).
+  const found = [];
+  for (const m of t.matchAll(/(\d{1,3})\s*[\/|]\s*(\d{1,3})/g)) {
+    const n = parseInt(m[1], 10);
+    const total = parseInt(m[2], 10);
+    if (n > 0 && total >= 10 && total <= 400 && n <= total + 160) found.push({ n, total });
+  }
+  const best = found.find((f) => f.n <= f.total) ?? found[0] ?? null;
   const names = t
     .split('\n')
-    .slice(0, 8)
+    .slice(0, 12)
     .map((l) => (l.replace(/\bHP\b.*$/i, '').match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.-]*(?: [A-Za-zÀ-ÿ'’.-]+)*/g) ?? []))
     .flat()
     .filter((s) => s.length >= 3 && !NOT_A_NAME.test(s))
-    .slice(0, 3);
-  return { number: m ? String(parseInt(m[1], 10)) : null, total: m ? parseInt(m[2], 10) : null, names };
+    .slice(0, 4);
+  return { number: best ? String(best.n) : null, total: best ? best.total : null, names };
 }
 
 /** Consulta para pokemontcg.io a partir de lo leído: número + total impreso, o si no el nombre. */

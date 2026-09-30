@@ -148,3 +148,10 @@ test('parseSearchText y sameNumber/numberVariants', () => {
   assert.deepEqual(numberVariants('4'), ['4', '04', '004']);
   assert.deepEqual(numberVariants('123'), ['123']);
 });
+
+test('parseCardText descarta números poco verosímiles y acepta la barra leída como |', () => {
+  assert.equal(parseCardText('HP 60/20 x\n023/165').number, '23');
+  assert.equal(parseCardText('023|165').total, 165);
+  assert.equal(parseCardText('5/8').number, null); // total < 10
+  assert.equal(parseCardText('199/165').number, '199'); // secreta: supera el total
+});
