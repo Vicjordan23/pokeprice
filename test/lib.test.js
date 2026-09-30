@@ -95,3 +95,15 @@ test('checkAlerts dispara una vez y no muta', () => {
   assert.equal(r.alerts.c.triggered.at, 1);
   assert.equal(alerts.a.triggered, null);
 });
+
+import { buildScanQueries } from '../src/lib.js';
+
+test('buildScanQueries ordena de más a menos selectiva', () => {
+  assert.deepEqual(buildScanQueries({ number: '23', total: 165, names: ['Charmander'] }), [
+    'name:"Charmander*" number:23',
+    'number:23 set.printedTotal:165',
+    'name:"Charmander*"',
+  ]);
+  assert.deepEqual(buildScanQueries({ number: '23', total: 165, names: [] }), ['number:23 set.printedTotal:165']);
+  assert.deepEqual(buildScanQueries({ number: null, total: null, names: [] }), []);
+});

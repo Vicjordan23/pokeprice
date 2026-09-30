@@ -135,3 +135,16 @@ export function checkAlerts(alerts, cards, now = Date.now()) {
   }
   return { alerts: next, fired };
 }
+
+/**
+ * Consultas a probar, de más a menos selectiva. Si una falla (pokemontcg.io da 500/504 a veces con
+ * ciertos filtros) o no devuelve nada, se pasa a la siguiente.
+ */
+export function buildScanQueries(parsed) {
+  const qs = [];
+  const nameQ = parsed.names.length ? buildQuery(parsed.names[0]) : null;
+  if (nameQ && parsed.number) qs.push(`${nameQ} number:${parsed.number}`);
+  if (parsed.number && parsed.total) qs.push(`number:${parsed.number} set.printedTotal:${parsed.total}`);
+  if (nameQ) qs.push(nameQ);
+  return qs;
+}

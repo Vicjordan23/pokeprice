@@ -1,4 +1,4 @@
-import { cardValue, changePct, chartPoints, buildQuery, buildIdsQuery, collectionTotal, esc, parseCardText, buildScanQuery, rankMatches, parseTarget, checkAlerts } from './lib.js';
+import { cardValue, changePct, chartPoints, buildQuery, buildIdsQuery, collectionTotal, esc, parseCardText, buildScanQueries, rankMatches, parseTarget, checkAlerts } from './lib.js';
 import { CONFIG } from './config.js';
 
 const SELECT = 'id,name,number,rarity,set,images,tcgplayer,cardmarket';
@@ -28,11 +28,11 @@ function save() {
   } catch { /* almacenamiento no disponible: la app sigue funcionando en memoria */ }
 }
 
-async function api(params, { retry = false } = {}) {
+async function api(params, { retry = false, timeout = 30000 } = {}) {
   const attempts = retry ? 2 : 1;
   for (let i = 1; i <= attempts; i++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 30000);
+    const timer = setTimeout(() => ctrl.abort(), timeout);
     try {
       const headers = CONFIG.apiKey ? { 'X-Api-Key': CONFIG.apiKey } : {};
       const res = await fetch(`${CONFIG.apiBase}/cards?${new URLSearchParams({ select: SELECT, ...params })}`, { headers, signal: ctrl.signal });
@@ -41,7 +41,7 @@ async function api(params, { retry = false } = {}) {
       for (const c of json.data) state.cards[c.id] = c;
       return json.data;
     } catch (err) {
-      const reason = err.name === 'AbortError' ? 'tiempo agotado (30 s)' : err.message;
+      const reason = err.name === 'AbortError' ? `tiempo agotado (${timeout / 1000} s)` : err.message;
       console.error('pokemontcg.io:', reason, err);
       state.lastApiError = reason;
       // Reintenta una vez si es un fallo del servidor o de red (pokemontcg.io a veces da 504 / se cuelga).
@@ -372,17 +372,26 @@ async function scanFile(file) {
   }
   if (seq !== scanSeq) return;
   const parsed = parseCardText(text);
-  const q = buildScanQuery(parsed);
+  const queries = buildScanQueries(parsed);
   const info = [parsed.number ? `${parsed.number}/${parsed.total}` : null, parsed.names[0]].filter(Boolean).join(' · ');
-  if (!q) return fail('No pude leer el nombre ni el número. Prueba con más luz, la carta plana y más cerca.');
-  try {
-    let data = await api({ q, pageSize: '40' }, { retry: true });
-    if (!data.length && parsed.names.length) data = await api({ q: buildQuery(parsed.names[0]), pageSize: '40' }, { retry: true });
-    if (seq !== scanSeq) return;
-    Object.assign(sc, { status: 'done', msg: '', info, results: rankMatches(data, text) });
-  } catch {
+  if (!queries.length) return fail('No pude leer el nombre ni el número. Prueba con más luz, la carta plana y más cerca.');
+  // Prueba las consultas de más a menos selectiva; si una falla en el servidor, sigue con la siguiente.
+  let data = null;
+  let failed = 0;
+  for (const q of queries) {
+    try {
+      const res = await api({ q, pageSize: '30' }, { timeout: 20000 });
+      if (seq !== scanSeq) return;
+      if (res.length) { data = res; break; }
+    } catch {
+      failed++;
+    }
+  }
+  if (seq !== scanSeq) return;
+  if (!data && failed === queries.length) {
     return fail(`Leí la carta (${info || 'sin datos claros'}) pero pokemontcg.io no respondió: ${state.lastApiError ?? 'sin conexión'}. Inténtalo de nuevo o usa Buscar.`);
   }
+  Object.assign(sc, { status: 'done', msg: '', info, results: rankMatches(data ?? [], text) });
   paintScan(true);
 }
 
