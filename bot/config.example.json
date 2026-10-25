@@ -1,0 +1,11 @@
+{
+  "intervalMinutes": 15,
+  "delayMs": 5000,
+  "thresholds": { "zeroMax": 0.99, "minDiscount": 80, "minReference": 15 },
+  "pages": [
+    { "store": "pccomponentes", "url": "https://www.pccomponentes.com/ofertas-flash" },
+    { "store": "mediamarkt", "url": "https://www.mediamarkt.es/es/campaign/ofertas" },
+    { "store": "elcorteingles", "url": "https://www.elcorteingles.es/electronica/ofertas/" },
+    { "store": "amazon", "url": "https://www.amazon.es/gp/goldbox" }
+  ]
+}

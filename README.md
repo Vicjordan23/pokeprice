@@ -37,3 +37,18 @@ Se publica sola en GitHub Pages con cada push a la rama principal (`.github/work
 ## Siguientes pasos
 
 - **Avisos con la app cerrada:** un pequeño servidor (o función programada) que consulte los precios y envíe notificaciones push (Web Push) o correo. Hoy las alertas viven solo en el navegador.
+
+## Bot de errores de precio (`bot/`)
+
+Vigila páginas de ofertas/categorías de tiendas (Amazon, MediaMarkt, El Corte Inglés, PcComponentes…) y avisa cuando un producto cuesta ~0 € o tiene un descuento ≥ 80 %.
+
+```bash
+cp bot/config.example.json bot/config.json   # edita las URLs a vigilar
+npm run bot                                   # una pasada
+node bot/run.js --loop                        # cada intervalMinutes
+```
+
+- **Detección:** lee JSON-LD `Product`/metaetiquetas. Compara con el precio tachado de la página o, si no existe, con el precio más alto visto antes (`bot/state.json`). Un «0 €» sin precio de referencia o sin stock se ignora (suele ser ruido).
+- **Avisos:** consola y, opcionalmente, Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`).
+- **Límites honestos:** respeta `robots.txt`, espera `delayMs` entre peticiones y no compra nada solo. Amazon y otras tiendas bloquean bots y muchas páginas cargan precios con JavaScript, así que el extractor genérico puede no ver nada; para esas tiendas hará falta un extractor propio o una API de afiliados. Revisa los términos de uso de cada tienda.
+- **Ojo:** las tiendas suelen cancelar los pedidos por error de precio y no están obligadas a servirlos; no pagues nada que no puedas perder.
