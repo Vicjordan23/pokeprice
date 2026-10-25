@@ -1,0 +1,40 @@
+name: Bot de errores de precio
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: price-bot
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # El historial de precios (bot/state.json) se conserva entre ejecuciones con la caché.
+      - uses: actions/cache/restore@v4
+        with:
+          path: bot/state.json
+          key: price-state-${{ github.run_id }}
+          restore-keys: price-state-
+      - name: Config (usa bot/config.json si existe, si no la de ejemplo)
+        run: cp -n bot/config.example.json bot/config.json
+      - run: node bot/run.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: bot/state.json
+          key: price-state-${{ github.run_id }}
