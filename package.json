@@ -6,6 +6,7 @@
   "description": "Consulta el precio de cartas Pokémon (datos de pokemontcg.io)",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "bot": "node bot/run.js"
   }
 }
