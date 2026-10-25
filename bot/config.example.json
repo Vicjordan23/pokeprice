@@ -20,17 +20,20 @@
     {
       "store": "dealabs",
       "type": "rss",
-      "url": "https://www.dealabs.com/rss"
+      "url": "https://www.dealabs.com/rss",
+      "onlySpainStores": true
     },
     {
       "store": "dealabs-nouveaux",
       "type": "rss",
-      "url": "https://www.dealabs.com/rss/nouveaux"
+      "url": "https://www.dealabs.com/rss/nouveaux",
+      "onlySpainStores": true
     },
     {
       "store": "mydealz",
       "type": "rss",
-      "url": "https://www.mydealz.de/rss"
+      "url": "https://www.mydealz.de/rss",
+      "onlySpainStores": true
     }
   ]
 }
