@@ -29,7 +29,7 @@ jobs:
           restore-keys: price-state-
       - name: Config (usa bot/config.json si existe, si no la de ejemplo)
         run: cp -n bot/config.example.json bot/config.json
-      - run: node bot/run.js
+      - run: node bot/run.js ${{ github.event_name == 'workflow_dispatch' && '--test' || '' }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

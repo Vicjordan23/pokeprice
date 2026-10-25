@@ -3,7 +3,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { classify } from './detect.js';
 import { extractProducts } from './extract.js';
-import { notify } from './notify.js';
+import { parseFeed, analyzeItem } from './rss.js';
+import { notify, notifyText } from './notify.js';
 
 const args = process.argv.slice(2);
 const arg = (name, def) => (args.includes(name) ? args[args.indexOf(name) + 1] : def);
@@ -48,7 +49,19 @@ async function scanOnce(config, state) {
       if (!(await allowedByRobots(page.url, ua))) { console.warn(`robots.txt no permite ${page.url}`); continue; }
       const res = await fetch(page.url, { headers: { 'user-agent': ua, 'accept-language': 'es-ES,es;q=0.9' } });
       if (!res.ok) { console.warn(`${res.status} ${page.url}`); continue; }
-      for (const p of extractProducts(await res.text(), page.url)) {
+      if (page.type === 'rss') {
+        const items = parseFeed(await res.text());
+        console.log(`${page.store ?? ''} ${page.url}: ${items.length} chollos leídos`);
+        for (const it of items) {
+          const deal = analyzeItem(it, config.thresholds);
+          if (deal && !state.alerted[it.link]) { state.alerted[it.link] = deal.price ?? 1; found.push(deal); }
+        }
+        await sleep(config.delayMs ?? 5000);
+        continue;
+      }
+      const products = extractProducts(await res.text(), page.url);
+      console.log(`${page.store ?? ''} ${page.url}: ${products.length} productos leídos`);
+      for (const p of products) {
         const hist = state.prices[p.url] ?? {};
         // Referencia: precio tachado de la página o el precio "normal" más alto visto antes.
         const reference = p.reference ?? hist.max ?? null;
@@ -75,6 +88,7 @@ async function main() {
     const deals = await scanOnce(config, state);
     await writeFile(statePath, JSON.stringify(state, null, 1));
     if (deals.length) await notify(deals); else console.log(`${new Date().toISOString()} sin chollos`);
+    if (args.includes('--test')) await notifyText('✅ Bot de chollos activo: la conexión con Telegram funciona.');
     if (!args.includes('--loop')) break;
     await sleep((config.intervalMinutes ?? 15) * 60_000);
   } while (true);

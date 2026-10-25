@@ -49,6 +49,7 @@ node bot/run.js --loop                        # cada intervalMinutes
 ```
 
 - **Detección:** lee JSON-LD `Product`/metaetiquetas. Compara con el precio tachado de la página o, si no existe, con el precio más alto visto antes (`bot/state.json`). Un «0 €» sin precio de referencia o sin stock se ignora (suele ser ruido).
+- **Fuentes RSS:** páginas con `"type": "rss"` (por defecto, los feeds de Chollometro) se analizan por título: avisan con «error de precio», precio ~0 €/gratis o descuento ≥ 80 %. Es la vía más fiable desde GitHub Actions, porque las tiendas suelen bloquear sus IPs.
 - **Avisos:** consola y, opcionalmente, Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`).
 - **Límites honestos:** respeta `robots.txt`, espera `delayMs` entre peticiones y no compra nada solo. Amazon y otras tiendas bloquean bots y muchas páginas cargan precios con JavaScript, así que el extractor genérico puede no ver nada; para esas tiendas hará falta un extractor propio o una API de afiliados. Revisa los términos de uso de cada tienda.
 - **Ojo:** las tiendas suelen cancelar los pedidos por error de precio y no están obligadas a servirlos; no pagues nada que no puedas perder.
