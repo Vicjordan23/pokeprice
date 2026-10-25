@@ -2,9 +2,10 @@
 const eur = (n) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
 export function formatDeal(d) {
-  const tag = d.kind === 'zero' ? '🚨 PRECIO ~0 €' : `🔥 -${d.discount}%`;
+  const tag = d.kind === 'zero' ? '🚨 PRECIO ~0 €' : d.kind === 'error' ? '⚠️ POSIBLE ERROR DE PRECIO' : `🔥 -${d.discount}%`;
   const was = d.reference != null ? ` (antes ${eur(d.reference)}, -${d.discount}%)` : '';
-  return `${tag}\n${d.name || '(sin nombre)'}\n${eur(d.price)}${was}\n${d.url}`;
+  const price = d.price != null ? `\n${eur(d.price)}${was}` : '';
+  return `${tag}\n${d.name || '(sin nombre)'}${price}\n${d.url}`;
 }
 
 export async function notifyText(text, env = process.env) {

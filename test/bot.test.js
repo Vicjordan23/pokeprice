@@ -28,3 +28,20 @@ test('extractProducts lee JSON-LD y metaetiquetas', () => {
   const meta = `<meta property="og:title" content="Cafetera"><meta property="product:price:amount" content="24,90">`;
   assert.equal(extractProducts(meta, 'https://x.es/c')[0].price, 24.9);
 });
+
+import { parseFeed, analyzeItem } from '../bot/rss.js';
+
+test('rss: parsea items y detecta errores de precio, 0 € y descuentos', () => {
+  const xml = `<rss><channel>
+    <item><title><![CDATA[Móvil X por 9,99€ (antes 249€)]]></title><link>https://c.es/1</link><description>ok</description></item>
+    <item><title>Cafetera 59€</title><link>https://c.es/2</link><description>ERROR DE PRECIO en la web</description></item>
+    <item><title>Auriculares GRATIS 0€</title><link>https://c.es/3</link><description></description></item>
+    <item><title>Aspiradora 120€ (antes 150€)</title><link>https://c.es/4</link><description></description></item>
+  </channel></rss>`;
+  const items = parseFeed(xml);
+  assert.equal(items.length, 4);
+  assert.equal(analyzeItem(items[0]).kind, 'deep');
+  assert.equal(analyzeItem(items[1]).kind, 'error');
+  assert.equal(analyzeItem(items[2]).kind, 'zero');
+  assert.equal(analyzeItem(items[3]), null);
+});
