@@ -18,7 +18,9 @@ export function parseFeed(xml) {
 }
 
 const PRICE_RE = /(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s?(?:€|eur\b)|(?:€|eur\b)\s?(\d+(?:[.,]\d{1,2})?)/gi;
-const ERROR_RE = /error(?:es)? de precio|fallo de precio|precio erróneo|price error|bug de precio|error en (?:el )?precio/i;
+// Errores de precio en es/fr/de/en/it/pt (los de Amazon suelen verse antes en Dealabs o Mydealz).
+const ERROR_RE = /error(?:es)? de precio|fallo de precio|precio erróneo|bug de precio|error en (?:el )?precio|erreur de prix|erreur de tarif|bug de prix|preisfehler|fehlerpreis|price error|pricing error|pricing mistake|errore di prezzo|erro de preço/i;
+const FREE_RE = /gratis|gratuit|kostenlos|umsonst|\bfree\b|\b0\s?€|0,00/i;
 
 /** Devuelve una oferta sospechosa o null. Mira sobre todo el título; la descripción solo para la palabra "error". */
 export function analyzeItem(item, opts = {}) {
@@ -32,7 +34,7 @@ export function analyzeItem(item, opts = {}) {
   const base = { name: item.title.slice(0, 160), url: item.link, price, reference, discount };
 
   if (ERROR_RE.test(`${item.title} ${item.desc}`)) return { ...base, kind: 'error' };
-  if (price != null && price <= zeroMax && /gratis|0\s?€|0,00/i.test(item.title)) return { ...base, kind: 'zero' };
+  if (price != null && price <= zeroMax && FREE_RE.test(item.title)) return { ...base, kind: 'zero' };
   if (discount != null && discount >= minDiscount) return { ...base, kind: 'deep' };
   return null;
 }
