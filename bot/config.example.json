@@ -1,16 +1,39 @@
 {
   "intervalMinutes": 15,
   "delayMs": 3000,
-  "thresholds": { "zeroMax": 0.99, "minDiscount": 80, "minReference": 15 },
+  "thresholds": {
+    "zeroMax": 0.99,
+    "minDiscount": 80,
+    "minReference": 15
+  },
   "pages": [
-    { "store": "chollometro", "type": "rss", "url": "https://www.chollometro.com/rss" },
-    { "store": "chollometro-nuevos", "type": "rss", "url": "https://www.chollometro.com/rss/nuevos" },
-    { "store": "chollometro-error-precio", "type": "rss", "url": "https://www.chollometro.com/rss/tag/error-de-precio" },
-    { "store": "dealabs", "type": "rss", "url": "https://www.dealabs.com/rss" },
-    { "store": "dealabs-nouveaux", "type": "rss", "url": "https://www.dealabs.com/rss/nouveaux" },
-    { "store": "dealabs-erreur-de-prix", "type": "rss", "url": "https://www.dealabs.com/rss/tag/erreur-de-prix" },
-    { "store": "mydealz", "type": "rss", "url": "https://www.mydealz.de/rss" },
-    { "store": "mydealz-neu", "type": "rss", "url": "https://www.mydealz.de/rss/neu" },
-    { "store": "mydealz-preisfehler", "type": "rss", "url": "https://www.mydealz.de/rss/tag/preisfehler" }
+    {
+      "store": "chollometro",
+      "type": "rss",
+      "url": "https://www.chollometro.com/rss"
+    },
+    {
+      "store": "chollometro-nuevos",
+      "type": "rss",
+      "url": "https://www.chollometro.com/rss/nuevos"
+    },
+    {
+      "store": "dealabs",
+      "type": "rss",
+      "url": "https://www.dealabs.com/rss",
+      "onlySpainStores": true
+    },
+    {
+      "store": "dealabs-nouveaux",
+      "type": "rss",
+      "url": "https://www.dealabs.com/rss/nouveaux",
+      "onlySpainStores": true
+    },
+    {
+      "store": "mydealz",
+      "type": "rss",
+      "url": "https://www.mydealz.de/rss",
+      "onlySpainStores": true
+    }
   ]
 }

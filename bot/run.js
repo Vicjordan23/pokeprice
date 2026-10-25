@@ -3,7 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { classify } from './detect.js';
 import { extractProducts } from './extract.js';
-import { parseFeed, analyzeItem } from './rss.js';
+import { parseFeed, analyzeItem, shipsToSpain } from './rss.js';
 import { notify, notifyText } from './notify.js';
 
 const args = process.argv.slice(2);
@@ -53,6 +53,7 @@ async function scanOnce(config, state) {
         const items = parseFeed(await res.text());
         console.log(`${page.store ?? ''} ${page.url}: ${items.length} chollos leídos`);
         for (const it of items) {
+          if (page.onlySpainStores && !shipsToSpain(it)) continue;
           const deal = analyzeItem(it, config.thresholds);
           if (deal && !state.alerted[it.link]) { state.alerted[it.link] = deal.price ?? 1; found.push(deal); }
         }

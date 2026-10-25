@@ -14,6 +14,8 @@ export function parseFeed(xml) {
     title: decode(tag(b, 'title')),
     link: decode(tag(b, 'link')) || b.match(/<link[^>]+href=["']([^"']+)/i)?.[1] || '',
     desc: decode(tag(b, 'description')),
+    // Pepper (Chollometro/Dealabs/Mydealz) indica la tienda en <pepper:merchant name="...">.
+    merchant: decode(b.match(/<pepper:merchant[^>]+name=["']([^"']+)/i)?.[1] ?? ''),
   })).filter((i) => i.title && i.link);
 }
 
@@ -37,4 +39,23 @@ export function analyzeItem(item, opts = {}) {
   if (price != null && price <= zeroMax && FREE_RE.test(item.title)) return { ...base, kind: 'zero' };
   if (discount != null && discount >= minDiscount) return { ...base, kind: 'deep' };
   return null;
+}
+
+// Tiendas que envían a España (para filtrar chollos de Dealabs/Mydealz, que son de otros países).
+const SPAIN_STORES = [
+  'amazon', 'media ?markt', 'pc ?componentes', 'corte ?ingl[eé]s', 'carrefour', 'fnac', 'worten', 'leroy ?merlin',
+  'ikea', 'decathlon', 'aliexpress', 'miravia', 'zalando', 'coolmod', 'pcbox', 'neobyte', 'globaldata', 'ldlc',
+  'alternate', 'notebooksbilliger', 'bricodepot', 'sprinter', 'jd ?sports', 'dyson', 'xiaomi', 'lidl', 'alcampo',
+  'apple', 'samsung', 'nike', 'adidas', 'lenovo', 'hp store', 'rakuten', 'ebay', 'tradeinn', 'powerplanetonline',
+  'versus ?gamers', 'game\\.es', 'steam', 'nintendo', 'playstation', 'xbox', 'tiendanimal', 'kiwoko', 'mango',
+  'zara', 'h&m', 'primark', 'conforama', 'maisons du monde', 'phone ?house', 'orange', 'vodafone', 'movistar',
+];
+const SPAIN_RE = new RegExp(`(?:^|[^a-z0-9])(?:${SPAIN_STORES.join('|')})(?![a-z0-9])`, 'i');
+const PICKUP_RE = /abholung|selbstabholung|retrait (?:en )?(?:magasin|drive)|click ?(?:&|and) ?collect/i;
+
+/** ¿Es de Amazon o de una tienda que envía a España? Descarta recogida en tienda física. */
+export function shipsToSpain(item) {
+  const text = `${item.merchant} ${item.title} ${item.desc} ${item.link}`;
+  if (!SPAIN_RE.test(text)) return false;
+  return !PICKUP_RE.test(text) || /amazon/i.test(text);
 }

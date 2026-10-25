@@ -51,3 +51,15 @@ test('rss: detecta errores de precio en francés y alemán', () => {
   assert.equal(analyzeItem({ title: 'Kopfhörer 19€', link: 'x', desc: 'Preisfehler bei Amazon' }).kind, 'error');
   assert.equal(analyzeItem({ title: 'Jeu kostenlos 0€', link: 'x', desc: '' }).kind, 'zero');
 });
+
+import { shipsToSpain } from '../bot/rss.js';
+
+test('shipsToSpain acepta Amazon y tiendas con envío a España y descarta recogida en tienda', () => {
+  const it = (title, desc = '', merchant = '') => ({ title, desc, merchant, link: 'https://x.test/1' });
+  assert.equal(shipsToSpain(it('Casque 25€', '', 'Amazon')), true);
+  assert.equal(shipsToSpain(it('Kopfhörer 19€ bei MediaMarkt')), true);
+  assert.equal(shipsToSpain(it('Aceite 2€ ATU - Abholung')), false);
+  assert.equal(shipsToSpain(it('Sofa 50€', '', 'Poco Domäne')), false);
+  assert.equal(shipsToSpain(it('Amazon 5€ Abholung')), true);
+  assert.equal(shipsToSpain(it('Pineapple 5€')), false);
+});
