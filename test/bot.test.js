@@ -45,3 +45,9 @@ test('rss: parsea items y detecta errores de precio, 0 € y descuentos', () => 
   assert.equal(analyzeItem(items[2]).kind, 'zero');
   assert.equal(analyzeItem(items[3]), null);
 });
+
+test('rss: detecta errores de precio en francés y alemán', () => {
+  assert.equal(analyzeItem({ title: 'Casque Sony 25€', link: 'x', desc: 'Erreur de prix sur Amazon' }).kind, 'error');
+  assert.equal(analyzeItem({ title: 'Kopfhörer 19€', link: 'x', desc: 'Preisfehler bei Amazon' }).kind, 'error');
+  assert.equal(analyzeItem({ title: 'Jeu kostenlos 0€', link: 'x', desc: '' }).kind, 'zero');
+});
