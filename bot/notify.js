@@ -7,16 +7,20 @@ export function formatDeal(d) {
   return `${tag}\n${d.name || '(sin nombre)'}\n${eur(d.price)}${was}\n${d.url}`;
 }
 
-export async function notify(deals, env = process.env) {
-  for (const d of deals) console.log(`\n${formatDeal(d)}`);
+export async function notifyText(text, env = process.env) {
   const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chat } = env;
-  if (!token || !chat) return;
+  if (!token || !chat) { console.warn('Telegram no configurado (faltan los secretos).'); return; }
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: chat, text }),
+  });
+  if (!res.ok) console.error(`Telegram ${res.status}`);
+}
+
+export async function notify(deals, env = process.env) {
   for (const d of deals) {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: chat, text: formatDeal(d), disable_web_page_preview: false }),
-    });
-    if (!res.ok) console.error(`Telegram ${res.status}`);
+    console.log(`\n${formatDeal(d)}`);
+    await notifyText(formatDeal(d), env);
   }
 }
