@@ -3,7 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { classify } from './detect.js';
 import { extractProducts } from './extract.js';
-import { parseFeed, analyzeItem, shipsToSpain } from './rss.js';
+import { parseFeed, parseTelegram, analyzeItem, shipsToSpain, findFeedUrl } from './rss.js';
 import { notify, notifyText } from './notify.js';
 
 const args = process.argv.slice(2);
@@ -49,12 +49,25 @@ async function scanOnce(config, state) {
       if (!(await allowedByRobots(page.url, ua))) { console.warn(`robots.txt no permite ${page.url}`); continue; }
       const res = await fetch(page.url, { headers: { 'user-agent': ua, 'accept-language': 'es-ES,es;q=0.9' } });
       if (!res.ok) { console.warn(`${res.status} ${page.url}`); continue; }
-      if (page.type === 'rss') {
-        const items = parseFeed(await res.text());
-        console.log(`${page.store ?? ''} ${page.url}: ${items.length} chollos leídos`);
+      if (page.type === 'rss' || page.type === 'telegram') {
+        let body = await res.text(), feedUrl = page.url;
+        if (page.type === 'rss' && !/<item[\s>]/i.test(body)) {
+          // No es un feed sino una página: se busca el feed que anuncia en su <head>.
+          const found = findFeedUrl(body, page.url);
+          if (!found) { console.warn(`${page.url}: no es un feed ni anuncia uno`); continue; }
+          if (!(await allowedByRobots(found, ua))) { console.warn(`robots.txt no permite ${found}`); continue; }
+          const r2 = await fetch(found, { headers: { 'user-agent': ua } });
+          if (!r2.ok) { console.warn(`${r2.status} ${found}`); continue; }
+          body = await r2.text(); feedUrl = found;
+        }
+        const items = page.type === 'telegram' ? parseTelegram(body) : parseFeed(body);
+        console.log(`${page.store ?? ''} ${feedUrl}: ${items.length} chollos leídos`);
+        // Ignora lo antiguo (p. ej. los ~20 mensajes que muestra un canal de Telegram la primera vez).
+        const maxAgeMs = (page.maxAgeHours ?? config.maxAgeHours ?? 24) * 3_600_000;
         for (const it of items) {
+          if (it.date && Date.now() - it.date > maxAgeMs) continue;
           if (page.onlySpainStores && !shipsToSpain(it)) continue;
-          const deal = analyzeItem(it, config.thresholds);
+          const deal = analyzeItem(it, { ...config.thresholds, ...page.thresholds });
           if (deal && !state.alerted[it.link]) { state.alerted[it.link] = deal.price ?? 1; found.push(deal); }
         }
         await sleep(config.delayMs ?? 5000);

@@ -63,3 +63,25 @@ test('shipsToSpain acepta Amazon y tiendas con envío a España y descarta recog
   assert.equal(shipsToSpain(it('Amazon 5€ Abholung')), true);
   assert.equal(shipsToSpain(it('Pineapple 5€')), false);
 });
+
+import { findFeedUrl } from '../bot/rss.js';
+
+test('findFeedUrl descubre el feed anunciado en el <head>', () => {
+  const html = '<head><link rel="alternate" type="application/rss+xml" title="x" href="/comments/feed/"></head>';
+  assert.equal(findFeedUrl(html, 'https://b.es/'), 'https://b.es/comments/feed/');
+  assert.equal(findFeedUrl('<head></head>', 'https://b.es/'), null);
+});
+
+import { parseTelegram } from '../bot/rss.js';
+
+test('parseTelegram extrae mensajes de la vista web de un canal', () => {
+  const html = `<div class="tgme_widget_message_wrap js-widget_message_wrap"><div class="tgme_widget_message text_not_supported_wrap" data-post="canal/123">
+    <div class="tgme_widget_message_text js-message_text" dir="auto">🔥 Auriculares 9,99€<br/>antes <b>79€</b> -87%</div>
+    <a class="tgme_widget_message_date" href="https://t.me/canal/123"><time datetime="2026-10-26T10:00:00+00:00" class="time">10:00</time></a></div></div>`;
+  const [m] = parseTelegram(html);
+  assert.equal(m.link, 'https://t.me/canal/123');
+  assert.match(m.title, /Auriculares 9,99€ antes 79€ -87%/);
+  assert.equal(m.date, Date.parse('2026-10-26T10:00:00+00:00'));
+  assert.equal(analyzeItem(m).kind, 'deep');
+  assert.deepEqual(parseTelegram('<html></html>'), []);
+});

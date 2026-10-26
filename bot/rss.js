@@ -15,6 +15,7 @@ export function parseFeed(xml) {
     link: decode(tag(b, 'link')) || b.match(/<link[^>]+href=["']([^"']+)/i)?.[1] || '',
     desc: decode(tag(b, 'description')),
     // Pepper (Chollometro/Dealabs/Mydealz) indica la tienda en <pepper:merchant name="...">.
+    date: Date.parse(decode(tag(b, 'pubDate'))) || null,
     merchant: decode(b.match(/<pepper:merchant[^>]+name=["']([^"']+)/i)?.[1] ?? ''),
   })).filter((i) => i.title && i.link);
 }
@@ -58,4 +59,34 @@ export function shipsToSpain(item) {
   const text = `${item.merchant} ${item.title} ${item.desc} ${item.link}`;
   if (!SPAIN_RE.test(text)) return false;
   return !PICKUP_RE.test(text) || /amazon/i.test(text);
+}
+
+/** Si la URL es una página HTML en vez de un feed, busca su <link rel="alternate" type="application/rss+xml">. */
+export function findFeedUrl(html, pageUrl) {
+  for (const [tagHtml] of html.matchAll(/<link\b[^>]*>/gi)) {
+    if (!/type=["']application\/rss\+xml["']/i.test(tagHtml) || !/rel=["']alternate["']/i.test(tagHtml)) continue;
+    const href = tagHtml.match(/href=["']([^"']+)/i)?.[1];
+    if (href) return new URL(decode(href), pageUrl).href;
+  }
+  return null;
+}
+
+/** Vista web pública de un canal (https://t.me/s/<canal>): cada mensaje pasa a ser un "chollo". */
+export function parseTelegram(html) {
+  const out = [];
+  for (const block of html.split('tgme_widget_message_wrap').slice(1)) {
+    const post = block.match(/data-post=["']([^"']+)/)?.[1];
+    const raw = block.match(/tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/)?.[1];
+    if (!post || !raw) continue;
+    const text = decode(raw.replace(/<br\s*\/?>/gi, ' '));
+    if (!text) continue;
+    out.push({
+      title: text.slice(0, 300),
+      desc: '',
+      link: `https://t.me/${post}`,
+      date: Date.parse(block.match(/<time[^>]+datetime=["']([^"']+)/)?.[1] ?? '') || null,
+      merchant: '',
+    });
+  }
+  return out;
 }
