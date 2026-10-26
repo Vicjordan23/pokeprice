@@ -21,6 +21,24 @@
       "store": "blogdechollos",
       "type": "rss",
       "url": "https://www.blogdechollos.com/"
+    },
+    {
+      "store": "telegram-precioconerrores",
+      "type": "telegram",
+      "url": "https://t.me/s/precioconerrores",
+      "maxAgeHours": 6,
+      "thresholds": {
+        "minDiscount": 60
+      }
+    },
+    {
+      "store": "telegram-erroresde_precio",
+      "type": "telegram",
+      "url": "https://t.me/s/erroresde_precio",
+      "maxAgeHours": 6,
+      "thresholds": {
+        "minDiscount": 60
+      }
     }
   ]
 }
