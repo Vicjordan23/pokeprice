@@ -16,6 +16,16 @@
       "store": "chollometro-nuevos",
       "type": "rss",
       "url": "https://www.chollometro.com/rss/nuevos"
+    },
+    {
+      "store": "blogdechollos",
+      "type": "rss",
+      "url": "https://www.blogdechollos.com/feed/"
+    },
+    {
+      "store": "ofertitas",
+      "type": "rss",
+      "url": "https://www.ofertitas.es/feed/"
     }
   ]
 }
