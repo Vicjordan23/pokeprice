@@ -3,7 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { classify } from './detect.js';
 import { extractProducts } from './extract.js';
-import { parseFeed, analyzeItem, shipsToSpain } from './rss.js';
+import { parseFeed, analyzeItem, shipsToSpain, findFeedUrl } from './rss.js';
 import { notify, notifyText } from './notify.js';
 
 const args = process.argv.slice(2);
@@ -50,8 +50,18 @@ async function scanOnce(config, state) {
       const res = await fetch(page.url, { headers: { 'user-agent': ua, 'accept-language': 'es-ES,es;q=0.9' } });
       if (!res.ok) { console.warn(`${res.status} ${page.url}`); continue; }
       if (page.type === 'rss') {
-        const items = parseFeed(await res.text());
-        console.log(`${page.store ?? ''} ${page.url}: ${items.length} chollos leídos`);
+        let body = await res.text(), feedUrl = page.url;
+        if (!/<item[\s>]/i.test(body)) {
+          // No es un feed sino una página: se busca el feed que anuncia en su <head>.
+          const found = findFeedUrl(body, page.url);
+          if (!found) { console.warn(`${page.url}: no es un feed ni anuncia uno`); continue; }
+          if (!(await allowedByRobots(found, ua))) { console.warn(`robots.txt no permite ${found}`); continue; }
+          const r2 = await fetch(found, { headers: { 'user-agent': ua } });
+          if (!r2.ok) { console.warn(`${r2.status} ${found}`); continue; }
+          body = await r2.text(); feedUrl = found;
+        }
+        const items = parseFeed(body);
+        console.log(`${page.store ?? ''} ${feedUrl}: ${items.length} chollos leídos`);
         for (const it of items) {
           if (page.onlySpainStores && !shipsToSpain(it)) continue;
           const deal = analyzeItem(it, config.thresholds);

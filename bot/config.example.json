@@ -20,12 +20,7 @@
     {
       "store": "blogdechollos",
       "type": "rss",
-      "url": "https://www.blogdechollos.com/feed/"
-    },
-    {
-      "store": "ofertitas",
-      "type": "rss",
-      "url": "https://www.ofertitas.es/feed/"
+      "url": "https://www.blogdechollos.com/"
     }
   ]
 }

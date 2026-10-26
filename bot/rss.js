@@ -59,3 +59,13 @@ export function shipsToSpain(item) {
   if (!SPAIN_RE.test(text)) return false;
   return !PICKUP_RE.test(text) || /amazon/i.test(text);
 }
+
+/** Si la URL es una página HTML en vez de un feed, busca su <link rel="alternate" type="application/rss+xml">. */
+export function findFeedUrl(html, pageUrl) {
+  for (const [tagHtml] of html.matchAll(/<link\b[^>]*>/gi)) {
+    if (!/type=["']application\/rss\+xml["']/i.test(tagHtml) || !/rel=["']alternate["']/i.test(tagHtml)) continue;
+    const href = tagHtml.match(/href=["']([^"']+)/i)?.[1];
+    if (href) return new URL(decode(href), pageUrl).href;
+  }
+  return null;
+}

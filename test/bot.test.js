@@ -63,3 +63,11 @@ test('shipsToSpain acepta Amazon y tiendas con envío a España y descarta recog
   assert.equal(shipsToSpain(it('Amazon 5€ Abholung')), true);
   assert.equal(shipsToSpain(it('Pineapple 5€')), false);
 });
+
+import { findFeedUrl } from '../bot/rss.js';
+
+test('findFeedUrl descubre el feed anunciado en el <head>', () => {
+  const html = '<head><link rel="alternate" type="application/rss+xml" title="x" href="/comments/feed/"></head>';
+  assert.equal(findFeedUrl(html, 'https://b.es/'), 'https://b.es/comments/feed/');
+  assert.equal(findFeedUrl('<head></head>', 'https://b.es/'), null);
+});
