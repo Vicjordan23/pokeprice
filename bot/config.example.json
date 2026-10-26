@@ -18,22 +18,14 @@
       "url": "https://www.chollometro.com/rss/nuevos"
     },
     {
-      "store": "dealabs",
+      "store": "blogdechollos",
       "type": "rss",
-      "url": "https://www.dealabs.com/rss",
-      "onlySpainStores": true
+      "url": "https://www.blogdechollos.com/feed/"
     },
     {
-      "store": "dealabs-nouveaux",
+      "store": "ofertitas",
       "type": "rss",
-      "url": "https://www.dealabs.com/rss/nouveaux",
-      "onlySpainStores": true
-    },
-    {
-      "store": "mydealz",
-      "type": "rss",
-      "url": "https://www.mydealz.de/rss",
-      "onlySpainStores": true
+      "url": "https://www.ofertitas.es/feed/"
     }
   ]
 }
