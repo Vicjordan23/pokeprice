@@ -25,24 +25,6 @@
       "thresholds": {
         "minDiscount": 60
       }
-    },
-    {
-      "store": "telegram-errores_de_precio",
-      "type": "telegram",
-      "url": "https://t.me/s/errores_de_precio",
-      "maxAgeHours": 6,
-      "thresholds": {
-        "minDiscount": 60
-      }
-    },
-    {
-      "store": "telegram-erroresdepreciosespana",
-      "type": "telegram",
-      "url": "https://t.me/s/erroresdepreciosespana",
-      "maxAgeHours": 6,
-      "thresholds": {
-        "minDiscount": 60
-      }
     }
   ]
 }
