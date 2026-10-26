@@ -3,7 +3,7 @@
   "delayMs": 3000,
   "thresholds": {
     "zeroMax": 0.99,
-    "minDiscount": 80,
+    "minDiscount": 70,
     "minReference": 15
   },
   "pages": [
