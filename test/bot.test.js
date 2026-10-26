@@ -85,3 +85,9 @@ test('parseTelegram extrae mensajes de la vista web de un canal', () => {
   assert.equal(analyzeItem(m).kind, 'deep');
   assert.deepEqual(parseTelegram('<html></html>'), []);
 });
+
+test('rss: ignora precios recurrentes (€/mes) aunque diga GRATIS', () => {
+  const it = { title: 'Hosting WordPress Business por (0,95€/mes + IVA) + Dominio GRATIS + Auditoría GRATIS (54€)', link: 'x', desc: '' };
+  assert.equal(analyzeItem(it), null);
+  assert.equal(analyzeItem({ title: 'Móvil 0€ gratis', link: 'x', desc: '' }).kind, 'zero');
+});

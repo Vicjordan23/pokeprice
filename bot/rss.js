@@ -22,13 +22,16 @@ export function parseFeed(xml) {
 
 const PRICE_RE = /(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s?(?:€|eur\b)|(?:€|eur\b)\s?(\d+(?:[.,]\d{1,2})?)/gi;
 // Errores de precio en es/fr/de/en/it/pt (los de Amazon suelen verse antes en Dealabs o Mydealz).
+const RECURRING_RE = /\(?\s*\d[\d.,]*\s?(?:€|eur)\s?(?:\/|al |por |cada )\s?(?:mes|año|ano|month|year|m\b)(?:\s*\+\s*IVA)?\s*\)?/gi;
 const ERROR_RE = /error(?:es)? de precio|fallo de precio|precio erróneo|bug de precio|error en (?:el )?precio|erreur de prix|erreur de tarif|bug de prix|preisfehler|fehlerpreis|price error|pricing error|pricing mistake|errore di prezzo|erro de preço/i;
 const FREE_RE = /gratis|gratuit|kostenlos|umsonst|\bfree\b|\b0\s?€|0,00/i;
 
 /** Devuelve una oferta sospechosa o null. Mira sobre todo el título; la descripción solo para la palabra "error". */
 export function analyzeItem(item, opts = {}) {
   const { zeroMax = 0.99, minDiscount = 80, minReference = 15 } = opts;
-  const prices = [...item.title.matchAll(PRICE_RE)].map((m) => parsePrice(m[1] ?? m[2])).filter((p) => p != null);
+  // Precios recurrentes (suscripciones, hosting, tarifas: "0,95€/mes", "9€ al año") no son el precio del producto.
+  const title = item.title.replace(RECURRING_RE, ' ');
+  const prices = [...title.matchAll(PRICE_RE)].map((m) => parsePrice(m[1] ?? m[2])).filter((p) => p != null);
   const price = prices.length ? Math.min(...prices) : null;
   const reference = prices.length > 1 ? Math.max(...prices) : null;
   const pct = Number(item.title.match(/-\s?(\d{2,3})\s?%/)?.[1]) || null;
