@@ -64,6 +64,9 @@ async function scanOnce(config, state) {
         console.log(`${page.store ?? ''} ${feedUrl}: ${items.length} chollos leídos`);
         // Ignora lo antiguo (p. ej. los ~20 mensajes que muestra un canal de Telegram la primera vez).
         const maxAgeMs = (page.maxAgeHours ?? config.maxAgeHours ?? 24) * 3_600_000;
+        const recent = items.filter((it) => !it.date || Date.now() - it.date <= maxAgeMs);
+        const newest = [...items].sort((a, b) => (b.date ?? 0) - (a.date ?? 0))[0];
+        console.log(`  ${recent.length} recientes; último: ${newest ? newest.title.slice(0, 90) : '-'}`);
         for (const it of items) {
           if (it.date && Date.now() - it.date > maxAgeMs) continue;
           if (page.onlySpainStores && !shipsToSpain(it)) continue;
