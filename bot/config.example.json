@@ -18,11 +18,6 @@
       "url": "https://www.chollometro.com/rss/nuevos"
     },
     {
-      "store": "blogdechollos",
-      "type": "rss",
-      "url": "https://www.blogdechollos.com/"
-    },
-    {
       "store": "telegram-precioconerrores",
       "type": "telegram",
       "url": "https://t.me/s/precioconerrores",
