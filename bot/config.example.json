@@ -18,18 +18,27 @@
       "url": "https://www.chollometro.com/rss/nuevos"
     },
     {
-      "store": "telegram-precioconerrores",
+      "store": "telegram-erroresde_precio",
       "type": "telegram",
-      "url": "https://t.me/s/precioconerrores",
+      "url": "https://t.me/s/erroresde_precio",
       "maxAgeHours": 6,
       "thresholds": {
         "minDiscount": 60
       }
     },
     {
-      "store": "telegram-erroresde_precio",
+      "store": "telegram-errores_de_precio",
       "type": "telegram",
-      "url": "https://t.me/s/erroresde_precio",
+      "url": "https://t.me/s/errores_de_precio",
+      "maxAgeHours": 6,
+      "thresholds": {
+        "minDiscount": 60
+      }
+    },
+    {
+      "store": "telegram-erroresdepreciosespana",
+      "type": "telegram",
+      "url": "https://t.me/s/erroresdepreciosespana",
       "maxAgeHours": 6,
       "thresholds": {
         "minDiscount": 60
