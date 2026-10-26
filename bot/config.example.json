@@ -16,24 +16,6 @@
       "store": "chollometro-nuevos",
       "type": "rss",
       "url": "https://www.chollometro.com/rss/nuevos"
-    },
-    {
-      "store": "dealabs",
-      "type": "rss",
-      "url": "https://www.dealabs.com/rss",
-      "onlySpainStores": true
-    },
-    {
-      "store": "dealabs-nouveaux",
-      "type": "rss",
-      "url": "https://www.dealabs.com/rss/nouveaux",
-      "onlySpainStores": true
-    },
-    {
-      "store": "mydealz",
-      "type": "rss",
-      "url": "https://www.mydealz.de/rss",
-      "onlySpainStores": true
     }
   ]
 }
